@@ -3,8 +3,9 @@ services:
     name: quizbuilder-ai
     env: python
     plan: free
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    rootDir: .
+    buildCommand: pip install -r ./backend/requirements.txt
+    startCommand: cd backend && python3 start_production.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
