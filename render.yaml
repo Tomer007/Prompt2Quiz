@@ -4,7 +4,7 @@ services:
     env: python
     plan: free
     rootDir: .
-    buildCommand: pip install -r ./backend/requirements.txt
+    buildCommand: pip install --no-cache-dir --prefer-binary -r ./backend/requirements.txt
     startCommand: cd backend && python3 start_production.py
     envVars:
       - key: PYTHON_VERSION
