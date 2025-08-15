@@ -1,0 +1,22 @@
+{
+  "name": "quizbuilder-ai-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for QuizBuilder AI - AI Practice Question Generator",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "python -m http.server 5173",
+    "start": "python -m http.server 5173",
+    "build": "echo 'No build step needed for vanilla JS'"
+  },
+  "keywords": [
+    "quiz",
+    "ai",
+    "questions",
+    "education",
+    "practice"
+  ],
+  "author": "QuizBuilder AI",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+}

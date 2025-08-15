@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizBuilder AI</title>
+    <link rel="stylesheet" href="/static/src/app.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>QuizBuilder AI</h1>
+            <p>Generate practice questions on any subject in any language</p>
+        </header>
+
+        <main>
+            <!-- Generation Form -->
+            <section class="form-section">
+                <h2>Generate Questions</h2>
+                <form id="generateForm" class="generate-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="examName">Exam Name *</label>
+                            <input type="text" id="examName" name="examName" list="examNameList" required 
+                                   placeholder="e.g., GMAT" value="SJT">
+                            <datalist id="examNameList">
+                                <option value="GMAT"></option>
+                                <option value="CCAT"></option>
+                                <option value="SAT"></option>
+                                <option value="Math"></option>
+                                <option value="SJT"></option>
+                                <option value="Personality"></option>
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="language">Language </label>
+                            <input type="text" id="language" name="language" list="languageList"  
+                                   placeholder="e.g., English" value="Hebrew">
+                            <datalist id="languageList">
+                                <option value="English"></option>
+                                <option value="Hebrew"></option>
+                                <option value="Arabic"></option>
+                                <option value="Spanish"></option>
+                                <option value="French"></option>
+                            </datalist>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="questionType">Question Type </label>
+                            <input type="text" id="questionType" name="questionType" list="questionTypeList"  
+                                   placeholder="e.g., Numerical" value="Verbal">
+                            <datalist id="questionTypeList">
+                                <option value="Numerical"></option>
+                                <option value="Verbal"></option>
+                                <option value="Fractions"></option>
+                                <option value="Percents"></option>
+                                <option value="Management"></option>
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="difficulty">Difficulty (1-10) </label>
+                            <input type="number" id="difficulty" name="difficulty"  
+                                   min="1" max="10" value="1">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="notes">Notes</label>
+                            <textarea id="notes" name="notes" rows="2" 
+                                      placeholder="Additional notes for the test creator"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="numQuestions">Number of Questions (1-50) </label>
+                            <input type="number" id="numQuestions" name="numQuestions"  
+                                   min="1" max="50" value="1">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>AI Engines</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="engines" value="gpt" checked>
+                                    GPT
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="engines" value="gemini" checked>
+                                    Gemini
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="engines" value="anthropic" checked>
+                                    Anthropic
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="engines" value="xai" checked>
+                                    xAI
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="generateBtn" class="btn btn-primary">Generate Questions</button>
+                </form>
+            </section>
+
+            <!-- Questions Display -->
+            <section class="questions-section">
+                <div class="section-header">
+                    <h2>Questions</h2>
+                    <div class="section-actions">
+                        <button id="downloadCsvBtn" class="btn btn-secondary">Download CSV</button>
+                    </div>
+                </div>
+                
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="in-progress">
+                        In Progress <span class="tab-count" id="inProgressCount">0</span>
+                    </button>
+                    <button class="tab-btn" data-tab="approved">
+                        Approved <span class="tab-count" id="approvedCount">0</span>
+                    </button>
+                    <button class="tab-btn" data-tab="deleted">
+                        Deleted <span class="tab-count" id="deletedCount">0</span>
+                    </button>
+                </div>
+                
+                <!-- In Progress Questions -->
+                <div id="inProgressContainer" class="tab-content active">
+                    <div class="questions-container">
+                        <p class="no-questions">No questions in progress. Use the form above to get started.</p>
+                    </div>
+                </div>
+                
+                <!-- Approved Questions -->
+                <div id="approvedContainer" class="tab-content">
+                    <div class="questions-container">
+                        <p class="no-questions">No approved questions yet.</p>
+                    </div>
+                </div>
+                
+                <!-- Deleted Questions -->
+                <div id="deletedContainer" class="tab-content">
+                    <div class="questions-container">
+                        <p class="no-questions">No deleted questions yet.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Generating questions...</p>
+        </div>
+    </div>
+
+    <script type="module" src="/static/src/main.js"></script>
+</body>
+</html>

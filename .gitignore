@@ -1,0 +1,8 @@
+backend/venv
+.env
+data/
+logs/
+app.log
+.cursorignore
+.cursorrules
+.cursorignore
