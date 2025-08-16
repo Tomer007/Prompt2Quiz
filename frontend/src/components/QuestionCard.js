@@ -15,6 +15,8 @@ export default class QuestionCard {
         const statusClass = `status-${this.question.status}`;
         const showVersion = !(this.question.status === 'draft' && this.question.version === 1);
         
+        const contentDirectionClass = this.getContentDirectionClass();
+
         card.innerHTML = `
             <div class="question-header">
                 <div class="engine-tag ${this.question.engine}">${this.question.engine.toUpperCase()}</div>
@@ -25,7 +27,7 @@ export default class QuestionCard {
                 </div>
             </div>
 
-            <div class="question-content">
+            <div class="question-content ${contentDirectionClass}">
                 <div class="question-text">${this.escapeHtml(this.question.question)}</div>
                 
                 ${this.question.options ? `
@@ -89,6 +91,13 @@ export default class QuestionCard {
 
         this.element = card;
         this.attachEventListeners();
+    }
+
+    getContentDirectionClass() {
+        const languageValue = (this.question.language || '').toString().toLowerCase();
+        const containsHebrew = /[\u0590-\u05FF]/.test(this.question.question || '');
+        const isRtl = languageValue.includes('hebrew') || containsHebrew;
+        return isRtl ? 'rtl' : 'ltr';
     }
 
     attachEventListeners() {

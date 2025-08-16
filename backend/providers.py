@@ -770,9 +770,6 @@ class AnthropicProvider:
             temperature=0.7,
             anthropic_api_key=api_key
         )
-        logger.info(f"!!!!!!!!!!!!     !!! AnthropicProvider initialized with model: {self.model.model}")
-        logger.debug("AnthropicProvider initialized with ChatAnthropicMessages")
-
     def generate_questions(self, exam_name: str, language: str, question_type: str,
                            difficulty: int, notes: str, num_questions: int) -> List[Question]:
         system_prompt = GENERATE_QUESTION_SYSTEM_PROMPT

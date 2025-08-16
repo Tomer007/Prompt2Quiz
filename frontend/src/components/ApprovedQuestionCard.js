@@ -12,6 +12,8 @@ export default class ApprovedQuestionCard {
         card.className = 'question-card approved-card';
         card.dataset.questionId = this.question.id;
 
+        const contentDirectionClass = this.getContentDirectionClass();
+
         card.innerHTML = `
             <div class="question-header">
                 <div class="engine-tag ${this.question.engine}">${this.question.engine.toUpperCase()}</div>
@@ -22,7 +24,7 @@ export default class ApprovedQuestionCard {
                 </div>
             </div>
 
-            <div class="question-content">
+            <div class="question-content ${contentDirectionClass}">
                 <div class="question-text">${this.escapeHtml(this.question.question)}</div>
                 
                 ${this.question.options ? `
@@ -63,6 +65,13 @@ export default class ApprovedQuestionCard {
 
         this.element = card;
         this.attachEventListeners();
+    }
+
+    getContentDirectionClass() {
+        const languageValue = (this.question.language || '').toString().toLowerCase();
+        const containsHebrew = /[\u0590-\u05FF]/.test(this.question.question || '');
+        const isRtl = languageValue.includes('hebrew') || containsHebrew;
+        return isRtl ? 'rtl' : 'ltr';
     }
 
     attachEventListeners() {
