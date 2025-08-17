@@ -772,6 +772,67 @@ body {
 .verdict-true { color: #16a34a; font-weight: 700; }
 .verdict-false { color: #dc2626; font-weight: 700; }
 
+/* Update banner */
+.update-banner {
+    position: fixed;
+    top: -80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(960px, 94%);
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: #111827;
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 12px;
+    padding: 12px 44px 12px 16px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    z-index: 1100;
+    transition: top 0.3s ease;
+}
+.update-banner.show { top: 16px; }
+.banner-close {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    width: 28px;
+    height: 28px;
+    line-height: 26px;
+    text-align: center;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.8);
+    color: #111827;
+    cursor: pointer;
+}
+.banner-close:hover { background: #fff; }
+
+/* Floating admin tools (top-right) */
+.admin-tools {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 10px;
+    z-index: 1101;
+}
+
+.admin-btn {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #474a4a, #222628);
+    color: #ffffff;
+    box-shadow: 0 10px 25px rgba(215, 226, 231, 0.35);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-btn:hover { transform: scale(1.07); box-shadow: 0 14px 32px rgba(2, 132, 199, 0.5); }
+.admin-btn:active { transform: scale(1.0); }
+
 /* Loading Overlay */
 .loading-overlay {
     position: fixed;

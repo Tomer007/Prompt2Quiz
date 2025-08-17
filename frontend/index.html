@@ -131,8 +131,11 @@
                             </div>
                             
                             <button type="submit" id="generateBtn" class="btn btn-primary generate-btn">
-                                Generate Questions
+                                Generate
                             </button>
+                                <button type="button" id="notifyUpdateBtn" class="btn btn-info btn-small">
+                                    Version
+                                </button>
                         </form>
                     </div>
                 </div>
@@ -217,6 +220,25 @@
 
     <script type="module" src="/static/src/main.js"></script>
     
+    <!-- Global update banner -->
+    <div id="updateBanner" class="update-banner" role="status" aria-live="polite">
+        <span>
+            We are deploying a new version. Some features may be temporarily unavailable. Sorry for the inconvenience 🙏
+        </span>
+        <button id="closeUpdateBanner" class="banner-close" aria-label="Dismiss">×</button>
+    </div>
+
+    <!-- Floating admin tools (top-right) -->
+    <div class="admin-tools" id="adminTools" aria-label="Admin tools">
+        <button id="notifyUpdateFab" class="admin-btn" title="new version" aria-label="new version">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 11v2a4 4 0 0 0 4 4h1"/>
+                <path d="M21 8v8"/>
+                <path d="M21 8a9 9 0 0 1-9 9H7a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4h5a9 9 0 0 1 9 9"/>
+            </svg>
+        </button>
+    </div>
+
     <script>
         function toggleCustomInput(selectId, customInputId) {
             const select = document.getElementById(selectId);
@@ -251,6 +273,20 @@
                 numSelect.addEventListener('change', syncFromSelect);
                 numRange.addEventListener('input', syncFromRange);
             }
+
+            // Update banner controls (support both settings button and floating FAB)
+            const updateBanner = document.getElementById('updateBanner');
+            const closeBanner = document.getElementById('closeUpdateBanner');
+            const showBanner = () => {
+                if (!updateBanner) return;
+                updateBanner.classList.add('show');
+                clearTimeout(window.__updateBannerTimer);
+                window.__updateBannerTimer = setTimeout(() => updateBanner.classList.remove('show'), 10000);
+            };
+            const updateBtn = document.getElementById('notifyUpdateBtn');
+            const updateFab = document.getElementById('notifyUpdateFab');
+            [updateBtn, updateFab].forEach(btn => btn && btn.addEventListener('click', showBanner));
+            if (closeBanner) closeBanner.addEventListener('click', () => updateBanner.classList.remove('show'));
             
             sidebarToggle.addEventListener('click', () => {
                 sidebarContent.classList.toggle('collapsed');
