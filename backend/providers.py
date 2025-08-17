@@ -258,7 +258,7 @@ Rules:
 
 "verdict": "approve", "needs_revision", or "reject"
 
-"issues": array of 0–3 concise English strings (empty array [] if no issues)
+"issues": array of 1–3 concise English suggestions (MUST NOT be empty). Always include at least one constructive suggestion even when the item is approved. If there are no critical issues, provide a minor improvement suggestion (e.g., "Use slightly more challenging distractors" or "Tighten the explanation by removing redundant phrasing").
 
 "confidence": float 0.0–1.0, one decimal precision
 

@@ -265,10 +265,59 @@ export default class QuestionCard {
         
         if (!validationResults) return;
         
-        const { aggregate, proposed_fix_hint } = results;
+        const { model_votes = {}, aggregate, proposed_fix_hint } = results;
+        const verdictRaw = (aggregate.final_verdict || '').toLowerCase();
+        const verdictLabel = verdictRaw === 'approve'
+            ? 'Approved'
+            : verdictRaw === 'needs_revision'
+                ? 'Needs revision'
+                : verdictRaw === 'reject'
+                    ? 'Rejected'
+                    : aggregate.final_verdict;
+        
+        // Build per-engine votes rows
+        const formatConfidence = (c) => {
+            if (typeof c !== 'number') return '';
+            // If provider returns 0..1 show %, otherwise show as fixed
+            return c <= 1 ? `${Math.round(c * 100)}%` : c.toFixed(1);
+        };
+        const formatVerdict = (v) => {
+            const vr = (v || '').toLowerCase();
+            if (vr === 'approve') return 'Approved';
+            if (vr === 'needs_revision') return 'Needs revision';
+            if (vr === 'reject') return 'Rejected';
+            return v || '';
+        };
+        const votesRows = Object.entries(model_votes).map(([engine, vote]) => `
+            <tr>
+                <td class="engine-cell">${engine.toUpperCase()}</td>
+                <td>${(vote.score ?? '').toString()}</td>
+                <td>${formatVerdict(vote.verdict)}</td>
+                <td>${formatConfidence(vote.confidence)}</td>
+                <td>${(vote.issues || []).join(', ')}</td>
+            </tr>
+        `).join('');
         
         // Create the results HTML
         const resultsHTML = `
+            ${votesRows ? `
+            <div class="validation-votes">
+                <div style="font-weight:600; margin-bottom:6px;">Per-engine results</div>
+                <table class="votes-table">
+                    <thead>
+                        <tr>
+                            <th>Engine</th>
+                            <th>Score</th>
+                            <th>Status</th>
+                            <th>Confidence</th>
+                            <th>Issues</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${votesRows}
+                    </tbody>
+                </table>
+            </div>` : ''}
             <div class="validation-summary">
                 <div class="validation-row">
                     <span class="validation-label">Mean score:</span>
@@ -279,8 +328,8 @@ export default class QuestionCard {
                     <span class="validation-value">${aggregate.solver_agreement ? 'Yes' : 'No'}</span>
                 </div>
                 <div class="validation-row">
-                    <span class="validation-label">Final verdict:</span>
-                    <span class="validation-value verdict-${aggregate.final_verdict}">${aggregate.final_verdict}</span>
+                    <span class="validation-label">Decision:</span>
+                    <span class="validation-value verdict-${verdictRaw}">${verdictLabel}</span>
                 </div>
                 ${aggregate.combined_issues.length > 0 ? `
                     <div class="validation-row">
