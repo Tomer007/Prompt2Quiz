@@ -133,9 +133,6 @@
                             <button type="submit" id="generateBtn" class="btn btn-primary generate-btn">
                                 Generate
                             </button>
-                                <button type="button" id="notifyUpdateBtn" class="btn btn-info btn-small">
-                                    Version
-                                </button>
                         </form>
                     </div>
                 </div>
@@ -146,7 +143,7 @@
                 <!-- Questions Display -->
                 <section class="questions-section">
                     <div class="section-header">
-                        <h2>Generated Questions:</h2>
+                        <h2>Generated Questions</h2>
                         <div class="section-actions">
                             <button id="downloadCsvBtn" class="btn-secondary">Download CSV</button>
                         </div>
@@ -261,7 +258,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const sidebarToggle = document.getElementById('sidebarToggle');
             const sidebarContent = document.getElementById('sidebarContent');
-            const toggleIcon = sidebarToggle.querySelector('svg');
+            const toggleIconPath = sidebarToggle.querySelector('svg path');
             // slider sync
             const numSelect = document.getElementById('numQuestions');
             const numRange = document.getElementById('numQuestionsRange');
@@ -288,16 +285,25 @@
             [updateBtn, updateFab].forEach(btn => btn && btn.addEventListener('click', showBanner));
             if (closeBanner) closeBanner.addEventListener('click', () => updateBanner.classList.remove('show'));
             
-            sidebarToggle.addEventListener('click', () => {
-                sidebarContent.classList.toggle('collapsed');
-                
-                if (sidebarContent.classList.contains('collapsed')) {
-                    toggleIcon.style.transform = 'rotate(180deg)';
+            const setToggleIcon = () => {
+                const collapsed = sidebarContent.classList.contains('collapsed');
+                if (collapsed) {
+                    // Right chevron
+                    toggleIconPath && toggleIconPath.setAttribute('d', 'M9 18l6-6-6-6');
                     sidebarToggle.title = 'Expand sidebar';
                 } else {
-                    toggleIcon.style.transform = 'rotate(0deg)';
+                    // Left chevron
+                    toggleIconPath && toggleIconPath.setAttribute('d', 'M15 18l-6-6 6-6');
                     sidebarToggle.title = 'Collapse sidebar';
                 }
+            };
+
+            // Initialize icon on load
+            setToggleIcon();
+
+            sidebarToggle.addEventListener('click', () => {
+                sidebarContent.classList.toggle('collapsed');
+                setToggleIcon();
             });
 
             // Tab functionality

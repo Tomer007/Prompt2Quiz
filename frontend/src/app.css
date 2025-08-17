@@ -120,13 +120,13 @@ body {
 
 .sidebar-toggle {
     position: absolute;
-    right: -1px;
-    top: 20px;
+    right: 5px;
+    top: 10px;
     background: linear-gradient(135deg, #3b82f6, #1d4ed8);
     color: white;
     border: none;
-    width: 44px;
-    height: 44px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
@@ -144,11 +144,15 @@ body {
 }
 
 .sidebar-title {
-    font-size: 1.5rem;
-    font-weight: 700;
+    font-size: 1.5rem;  
+    font-weight: 500;
     color: #1e293b;
     margin-bottom: 24px;
-    text-align: center;
+    text-align: left;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .form-content {
@@ -397,12 +401,14 @@ body {
 }
 
 .section-header h2 {
-    font-size: 1.875rem;
-    font-weight: 700;
+    font-size: 1.5rem;  
+    font-weight: 500;
     color: #1e293b;
+    margin-bottom: 24px;
+    text-align: center;
     background: linear-gradient(135deg, #1e3c72, #2a5298);
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    -webkit-text-fill-color: transparent; 
     background-clip: text;
 }
 
