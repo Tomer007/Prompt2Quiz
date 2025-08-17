@@ -17,6 +17,21 @@ export default class App {
         this.loadExistingQuestions();
     }
 
+    getQuestionTimestamp(question) {
+        try {
+            // Prefer created_at; fallback to deleted_at for deleted list, else 0
+            const primary = question && question.created_at ? new Date(question.created_at).getTime() : 0;
+            const secondary = question && question.deleted_at ? new Date(question.deleted_at).getTime() : 0;
+            return Math.max(primary, secondary);
+        } catch (_) {
+            return 0;
+        }
+    }
+
+    sortNewestFirst(list) {
+        return (list || []).slice().sort((a, b) => this.getQuestionTimestamp(b) - this.getQuestionTimestamp(a));
+    }
+
     bindEvents() {
         const generateForm = document.getElementById('generateForm');
         const downloadCsvBtn = document.getElementById('downloadCsvBtn');
@@ -42,15 +57,15 @@ export default class App {
         try {
             // Load in-progress questions
             const inProgressResponse = await API.getQuestions('in_progress');
-            this.inProgressQuestions = inProgressResponse.questions || [];
+            this.inProgressQuestions = this.sortNewestFirst(inProgressResponse.questions);
             
             // Load approved questions
             const approvedResponse = await API.getQuestions('approved');
-            this.approvedQuestions = approvedResponse.questions || [];
+            this.approvedQuestions = this.sortNewestFirst(approvedResponse.questions);
             
             // Load deleted questions
             const deletedResponse = await API.getQuestions('deleted');
-            this.deletedQuestions = deletedResponse.questions || [];
+            this.deletedQuestions = this.sortNewestFirst(deletedResponse.questions);
             
             this.renderQuestions();
             this.updateTabCounts();
@@ -85,7 +100,7 @@ export default class App {
         if (tabName === 'in-progress') {
             try {
                 const inProgressResponse = await API.getQuestions('in_progress');
-                this.inProgressQuestions = inProgressResponse.questions || [];
+                this.inProgressQuestions = this.sortNewestFirst(inProgressResponse.questions);
             } catch (err) {
                 console.error('Failed to refresh in-progress questions:', err);
             }
@@ -94,7 +109,7 @@ export default class App {
         } else if (tabName === 'approved') {
             try {
                 const approvedResponse = await API.getQuestions('approved');
-                this.approvedQuestions = approvedResponse.questions || [];
+                this.approvedQuestions = this.sortNewestFirst(approvedResponse.questions);
             } catch (err) {
                 console.error('Failed to refresh approved questions:', err);
             }
@@ -103,7 +118,7 @@ export default class App {
         } else if (tabName === 'deleted') {
             try {
                 const deletedResponse = await API.getQuestions('deleted');
-                this.deletedQuestions = deletedResponse.questions || [];
+                this.deletedQuestions = this.sortNewestFirst(deletedResponse.questions);
             } catch (err) {
                 console.error('Failed to refresh deleted questions:', err);
             }
@@ -139,8 +154,11 @@ export default class App {
 
             const response = await API.generateQuestions(data);
             
-            // Add new questions to in-progress list
-            this.inProgressQuestions.push(...response.questions);
+            // Add new questions and keep newest first
+            this.inProgressQuestions = this.sortNewestFirst([
+                ...response.questions,
+                ...this.inProgressQuestions,
+            ]);
             
             // Render the new questions
             this.renderQuestions();
@@ -269,8 +287,8 @@ export default class App {
         // Remove from in-progress list
         this.inProgressQuestions = this.inProgressQuestions.filter(q => q.id !== question.id);
         
-        // Add to approved list
-        this.approvedQuestions.unshift(question); // Add to beginning
+        // Add to approved list and keep newest first
+        this.approvedQuestions = this.sortNewestFirst([question, ...this.approvedQuestions]);
         
         // Re-render both sections
         this.renderQuestions();
@@ -284,8 +302,8 @@ export default class App {
         // Remove from approved list
         this.approvedQuestions = this.approvedQuestions.filter(q => q.id !== question.id);
         
-        // Add back to in-progress list
-        this.inProgressQuestions.unshift(question); // Add to beginning
+        // Add back to in-progress list and keep newest first
+        this.inProgressQuestions = this.sortNewestFirst([question, ...this.inProgressQuestions]);
         
         // Re-render both sections
         this.renderQuestions();
@@ -299,8 +317,8 @@ export default class App {
         // Remove from in-progress list
         this.inProgressQuestions = this.inProgressQuestions.filter(q => q.id !== question.id);
         
-        // Add to deleted list
-        this.deletedQuestions.unshift(question); // Add to beginning
+        // Add to deleted list and keep newest first
+        this.deletedQuestions = this.sortNewestFirst([question, ...this.deletedQuestions]);
         
         // Re-render all sections
         this.renderQuestions();
@@ -314,8 +332,8 @@ export default class App {
         // Remove from deleted list
         this.deletedQuestions = this.deletedQuestions.filter(q => q.id !== question.id);
         
-        // Add back to in-progress list
-        this.inProgressQuestions.unshift(question); // Add to beginning
+        // Add back to in-progress list and keep newest first
+        this.inProgressQuestions = this.sortNewestFirst([question, ...this.inProgressQuestions]);
         
         // Re-render all sections
         this.renderQuestions();
