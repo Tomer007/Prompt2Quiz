@@ -12,6 +12,7 @@ export default class App {
         this.lastEvaluations = null;
         this.lastWinnerId = null;
         this.lastCandidates = null; // [{id, engine}] from latest selection round
+        this.lastRequest = null; // user input used for the last selection round
         this.init();
     }
 
@@ -177,6 +178,7 @@ export default class App {
             this.lastEvaluations = response.evaluations || null;
             this.lastWinnerId = response.winner_id || null;
             this.lastCandidates = (response.questions || []).map(q => ({ id: q.id, engine: q.engine }));
+            this.lastRequest = data;
             this.saveSelectionRoundToStorage();
             this.renderTournamentResults(this.lastCandidates);
             this.highlightTournamentWinner();
@@ -299,11 +301,12 @@ export default class App {
             const tabBtnsHtml = candidates.map((q, idx) => {
                 const engine = (q.engine || '').toString().toUpperCase();
                 return `<button class="mini-tab-btn ${idx === 0 ? 'active' : ''}" data-tab="${tabsId}-${idx}"><span class="engine-pill ${q.engine}">${engine}</span></button>`;
-            }).join('') + `<button class="mini-tab-btn" data-tab="${tabsId}-stats"><span class="mini-tab-label">STATS</span></button>`;
+            }).join('') + `<button class="mini-tab-btn" data-tab="${tabsId}-stats"><span class="mini-tab-label">STATS</span></button>` + `<button class="mini-tab-btn" data-tab="${tabsId}-query"><span class="mini-tab-label">QUERY</span></button>`;
             const tabContentsHtml = candidates.map((q, idx) => `
                 <div id="${tabsId}-${idx}" class="mini-tab-content ${idx === 0 ? 'active' : ''}"></div>
             `).join('') + `
                 <div id="${tabsId}-stats" class="mini-tab-content"></div>
+                <div id="${tabsId}-query" class="mini-tab-content"></div>
             `;
 
             host.innerHTML = `
@@ -397,6 +400,30 @@ export default class App {
                 }
             } catch (_) {
                 // ignore stats render errors
+            }
+
+            // Render user input query/settings inside query tab
+            try {
+                const queryMount = host.querySelector(`#${tabsId}-query`);
+                if (queryMount) {
+                    const req = this.lastRequest || {};
+                    const engines = (req.engines || []).map(e => e.toString().toUpperCase()).join(', ');
+                    const details = {
+                        Exam: req.exam_name,
+                        Language: req.language,
+                        Type: req.question_type,
+                        Difficulty: typeof req.difficulty === 'number' ? req.difficulty : (req.difficulty || ''),
+                        Notes: req.notes || '',
+                        Engines: engines,
+                        Requested: (req.num_questions != null ? req.num_questions : ''),
+                    };
+                    const rows = Object.entries(details).map(([k, v]) => `
+                        <div class="query-row"><span class="query-key">${k}:</span><span class="query-val">${this.escapeHtml ? this.escapeHtml(String(v)) : String(v)}</span></div>
+                    `).join('');
+                    queryMount.innerHTML = `<div class="query-details">${rows}</div>`;
+                }
+            } catch (_) {
+                // ignore
             }
         } catch (err) {
             console.error('Failed to render tournament results:', err);

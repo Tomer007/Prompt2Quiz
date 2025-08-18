@@ -476,6 +476,20 @@ body {
 .mini-tab-content { display: none; }
 .mini-tab-content.active { display: block; }
 
+/* Query details tab */
+.query-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+.query-row { display: contents; }
+.query-key { color: #6b7280; font-weight: 700; }
+.query-val { color: #111827; }
+
 .section-header {
     display: flex;
     justify-content: space-between;
