@@ -2,7 +2,7 @@ import csv
 import os
 import uuid
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 from datetime import datetime, timezone
 from schemas import Question, EngineType
 from providers import OpenAIProvider, GeminiProvider, AnthropicProvider, XAIProvider
@@ -14,9 +14,8 @@ class QuestionService:
     def __init__(self):
         logger.info("Initializing QuestionService...")
         self.questions: List[Question] = []
-        # Create a unique CSV file per backend session
-        unique_suffix = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-        self.csv_file_path = f"../data/export_{unique_suffix}.csv"
+        # Use one CSV file per day (UTC): ../data/export_YYYYMMDD.csv
+        self.csv_file_path = self._current_csv_path_for_today()
         self._ensure_csv_directory()
         self._initialize_csv()
         logger.info(f"QuestionService initialized with CSV path: {self.csv_file_path}")
@@ -55,6 +54,25 @@ class QuestionService:
                 logger.debug(f"CSV file already exists: {self.csv_file_path}")
         except Exception as e:
             logger.error(f"Error initializing CSV file: {e}")
+
+    def _current_csv_path_for_today(self) -> str:
+        """Build the CSV path for today's date (UTC)."""
+        today_str = datetime.now(timezone.utc).strftime('%Y%m%d')
+        return f"../data/export_{today_str}.csv"
+
+    def _rotate_csv_if_new_day(self):
+        """Ensure the CSV file path points to today's file; re-init if day changed."""
+        expected_path = self._current_csv_path_for_today()
+        if self.csv_file_path != expected_path:
+            self.csv_file_path = expected_path
+            self._ensure_csv_directory()
+            self._initialize_csv()
+            logger.info(f"Rotated CSV to today's file: {self.csv_file_path}")
+
+    def get_csv_file_path(self) -> str:
+        """Public accessor that also rotates file at day boundaries."""
+        self._rotate_csv_if_new_day()
+        return self.csv_file_path
     
     def _ensure_csv_bom(self):
         """Ensure CSV file has UTF-8 BOM for Hebrew support"""
@@ -81,54 +99,143 @@ class QuestionService:
         except Exception as e:
             logger.warning(f"Could not ensure CSV BOM: {e}")
     
-    def generate_questions(self, exam_name: str, language: str, question_type: str, 
-                          difficulty: int, notes: str, num_questions: int, 
-                          engines: List[EngineType]) -> List[Question]:
-        """Generate questions using the specified AI engines"""
-        logger.info(f"Generating {num_questions} questions for {exam_name} ({language}, {question_type}, difficulty {difficulty})")
-        logger.info(f"Requested engines: {engines}")
-        
-        all_questions = []
-        
+    def generate_questions(self, exam_name: str, language: str, question_type: str,
+                           difficulty: int, notes: str, num_questions: int,
+                           engines: List[EngineType]) -> Tuple[List[Question], Dict[str, Dict[str, dict]], Optional[str]]:
+        """Tournament-style generation and cross-evaluation.
+
+        Flow:
+        1) Each engine generates ONE candidate question.
+        2) Each engine evaluates ALL candidates (including its own) and produces a score.
+        3) For each evaluator, rank candidates by score (desc) and assign points N..1.
+        4) Sum points across evaluators and declare a winner.
+
+        Returns: (questions, evaluations, winner_id)
+        - questions: list of all candidate questions
+        - evaluations: mapping question_id -> engine -> ranked vote payload
+        - winner_id: id of best-scoring question
+        """
+
+        logger.info(
+            "Tournament generation for %s (%s, %s, difficulty %s) using engines: %s",
+            exam_name, language, question_type, difficulty, engines
+        )
+
+        def provider_for(engine: EngineType):
+            if engine == EngineType.gpt:
+                return OpenAIProvider()
+            if engine == EngineType.gemini:
+                return GeminiProvider()
+            if engine == EngineType.anthropic:
+                return AnthropicProvider()
+            if engine == EngineType.xai:
+                return XAIProvider()
+            raise ValueError(f"Unknown engine type: {engine}")
+
+        # 1) Each engine generates exactly one candidate question
+        candidates: Dict[EngineType, Question] = {}
         for engine in engines:
             try:
-                logger.info(f"Attempting to generate questions with {engine} engine...")
-                
-                if engine == EngineType.gpt:
-                    provider = OpenAIProvider()
-                    logger.debug("OpenAI provider created successfully")
-                elif engine == EngineType.gemini:
-                    provider = GeminiProvider()
-                    logger.debug("Gemini provider created successfully")
-                elif engine == EngineType.anthropic:
-                    provider = AnthropicProvider()
-                    logger.debug("Anthropic provider created successfully")
-                elif engine == EngineType.xai:
-                    provider = XAIProvider()
-                    logger.debug("XAI provider created successfully")
-                else:
-                    logger.warning(f"Unknown engine type: {engine}")
-                    continue
-                
-                questions = provider.generate_questions(
-                    exam_name, language, question_type, difficulty, notes, num_questions
+                provider = provider_for(engine)
+                generated = provider.generate_questions(
+                    exam_name, language, question_type, difficulty, notes, 1
                 )
-                
-                logger.info(f"Successfully generated {len(questions)} questions with {engine} engine")
-                all_questions.extend(questions)
-                
-            except ValueError as e:
-                logger.warning(f"Engine {engine} not configured: {e}")
-                continue
+                if not generated:
+                    logger.warning("%s did not return a question", engine)
+                    continue
+                q = generated[0]
+                candidates[engine] = q
+                logger.info("Engine %s produced candidate %s", engine, q.id[:8])
             except Exception as e:
-                logger.error(f"Error generating questions with {engine} engine: {e}", exc_info=True)
+                logger.error("Error generating with %s: %s", engine, e, exc_info=True)
+
+        if not candidates:
+            logger.error("No candidates were generated")
+            return [], {}, None
+
+        # 2) Cross-evaluate all candidates with each engine
+        evaluations: Dict[str, Dict[str, dict]] = {}
+        engines_effective = list(candidates.keys())
+        num_cands = len(engines_effective)
+
+        def build_payload(question: Question) -> dict:
+            return {
+                "id": question.id,
+                "engine": question.engine,
+                "exam_name": question.exam_name,
+                "language": question.language,
+                "question_type": question.question_type,
+                "difficulty": question.difficulty,
+                "question": question.question,
+                "options": question.options,
+                "answer": question.answer,
+                "explanation": question.explanation,
+            }
+
+        # Raw scores per evaluator for ranking
+        for evaluator in engines_effective:
+            try:
+                eval_provider = provider_for(evaluator)
+            except Exception as e:
+                logger.warning("Evaluator %s unavailable: %s", evaluator, e)
                 continue
-        
-        # Add to our in-memory storage
-        self.questions.extend(all_questions)
-        logger.info(f"Total questions in storage: {len(self.questions)}")
-        
-        return all_questions
+
+            scores_for_evaluator: List[Tuple[str, float, dict]] = []  # (qid, score, vote)
+            for cand_engine, cand in candidates.items():
+                # Skip self-evaluation: an engine must not evaluate its own candidate
+                if cand_engine == evaluator:
+                    continue
+                try:
+                    parsed = eval_provider.verify_question(build_payload(cand))
+                    score = float(parsed.get("score", 0.0))
+                    vote = {
+                        "score": score,
+                        "verdict": str(parsed.get("verdict", "needs_revision")),
+                        "issues": parsed.get("issues", [])[:3] or [],
+                        "confidence": float(parsed.get("confidence", 0.0)),
+                    }
+                    scores_for_evaluator.append((cand.id, score, vote))
+                except Exception as e:
+                    logger.warning("Evaluator %s failed on %s: %s", evaluator, cand.id[:8], e)
+
+            # Rank by score desc; tie-break by question id for determinism
+            scores_for_evaluator.sort(key=lambda t: (t[1], t[0]), reverse=True)
+            for rank_index, (qid, _score, vote) in enumerate(scores_for_evaluator, start=1):
+                points = max(num_cands - rank_index + 1, 1)
+                vote_with_rank = {**vote, "rank": rank_index, "points": points}
+                evaluations.setdefault(qid, {})[evaluator.value] = vote_with_rank
+            
+
+        # 3) Sum points across evaluators to find winner
+        totals: Dict[str, int] = {}
+        for qid, engine_votes in evaluations.items():
+            totals[qid] = sum(v.get("points", 0) for v in engine_votes.values())
+
+        if not totals:
+            logger.error("No evaluations available; returning candidates without winner")
+            # Add candidates to storage and return
+            all_candidates = list(candidates.values())
+            self.questions.extend(all_candidates)
+            logger.info(f"All candidates: {all_candidates}")
+            return all_candidates, evaluations, None
+
+        # Winner: highest total points, tie-break by mean score then id
+        def mean_score(qid: str) -> float:
+            votes = evaluations.get(qid, {}).values()
+            scores = [v.get("score", 0.0) for v in votes]
+            return sum(scores) / len(scores) if scores else 0.0
+
+        winner_id = max(totals.keys(), key=lambda qid: (totals[qid], mean_score(qid), qid))
+
+        # 4) Add candidates to storage
+        all_candidates = list(candidates.values())
+        self.questions.extend(all_candidates)
+        logger.info("Tournament winner: %s", winner_id[:8])
+        logger.info(f"All candidates: {all_candidates}")
+        logger.info(f"Evaluations: {evaluations}")
+        logger.info(f"Winner: {winner_id}")
+
+        return all_candidates, evaluations, winner_id
     
     def get_question_by_id(self, question_id: str) -> Optional[Question]:
         """Get a question by its ID"""
@@ -240,6 +347,8 @@ class QuestionService:
             return False
         
         logger.info(f"Question {question_id[:8]}... is approved, proceeding with CSV export")
+        # Ensure we are writing to today's CSV file
+        self._rotate_csv_if_new_day()
         
         try:
             # Prepare options as string

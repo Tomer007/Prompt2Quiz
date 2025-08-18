@@ -12,8 +12,7 @@ from typing import Optional
 from schemas import (
     GenerateRequest, GenerateResponse, ImproveRequest, ImproveResponse,
     ApproveRequest, ApproveResponse, DeleteRequest, DeleteResponse,
-    ExportRequest, ExportResponse, UnapproveRequest, UndeleteRequest,
-    VerifyRequest, VerificationResponse
+    ExportRequest, ExportResponse, UnapproveRequest, UndeleteRequest
 )
 from services import QuestionService
 
@@ -114,7 +113,7 @@ async def generate_questions(request: GenerateRequest):
     try:
         start_time = time.time()
         
-        questions = question_service.generate_questions(
+        questions, evaluations, winner_id = question_service.generate_questions(
             exam_name=request.exam_name,
             language=request.language,
             question_type=request.question_type,
@@ -134,9 +133,12 @@ async def generate_questions(request: GenerateRequest):
             )
         
         logger.info(f"Successfully generated {len(questions)} questions in {process_time:.3f}s")
-        logger.info(f"Questions from engines: {[q.engine for q in questions]}")
+        try:
+            logger.info(f"Questions from engines: {[q.engine for q in questions]}")
+        except Exception:
+            pass
         
-        return GenerateResponse(questions=questions)
+        return GenerateResponse(questions=questions, evaluations=evaluations, winner_id=winner_id)
         
     except ValueError as e:
         logger.error(f"Validation error in generate request: {e}")
@@ -246,7 +248,7 @@ async def export_question(request: ExportRequest):
         
         return ExportResponse(
             success=True,
-            file_path=question_service.csv_file_path
+            file_path=question_service.get_csv_file_path()
         )
         
     except HTTPException:
@@ -262,7 +264,7 @@ async def download_csv():
     logger.info("CSV download request received")
     
     try:
-        csv_file_path = question_service.csv_file_path
+        csv_file_path = question_service.get_csv_file_path()
         
         if not os.path.exists(csv_file_path):
             logger.error("CSV file not found")
@@ -373,31 +375,7 @@ async def can_export_question(question_id: str):
         logger.error(f"Error checking export eligibility for question {question_id[:8]}...: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@app.post("/verify", response_model=VerificationResponse)
-async def verify_question(request: VerifyRequest):
-    """Verify a question using providers via service layer"""
-    logger.info(f"Verify request received for question {request.id[:8]}...")
-    try:
-        item_payload = {
-            "exam_name": request.exam_name,
-            "language": request.language,
-            "question_type": request.question_type,
-            "difficulty": request.difficulty,
-            "question": request.question,
-            "options": request.options,
-            "answer": request.answer,
-            "explanation": request.explanation,
-        }
-        result = question_service.verify_question(item_payload)
-        return VerificationResponse(**result)
-    except ValueError as e:
-        logger.error(f"Verification error: {e}")
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error verifying question {request.id[:8]}...: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
- 
 
 @app.on_event("startup")
 async def startup_event():

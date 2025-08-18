@@ -391,6 +391,91 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
+/* Tournament panel */
+.tournament-container {
+    margin: 8px 0 16px;
+    padding: 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+.tournament-container.is-empty { opacity: 0.8; }
+.tournament-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.tournament-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.tournament-empty {
+    color: #6b7280;
+    font-style: italic;
+}
+.tournament-table-wrap { overflow-x: auto; }
+.tournament-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+}
+.tournament-table thead th {
+    background: #f9fafb;
+    color: #374151;
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.tournament-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: top;
+}
+.tournament-table tbody tr:last-child td { border-bottom: none; }
+.tournament-table tbody tr:hover { background: #f9fafb; }
+.tournament-table .winner-row { background: #ecfeff; }
+
+/* Mini tabs for selection round question cards */
+.mini-tabs { margin-top: 8px; }
+.mini-tab-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.mini-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 700;
+    color: #374151;
+}
+.mini-tab-btn.active {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+}
+.mini-tab-label { font-size: 0.8rem; }
+.mini-tab-contents { width: 100%; }
+.mini-tab-content { display: none; }
+.mini-tab-content.active { display: block; }
+
 .section-header {
     display: flex;
     justify-content: space-between;
@@ -571,6 +656,40 @@ body {
     width: 100%;
 }
 
+/* Winner section + collapsible others */
+.winner-section { margin-bottom: 8px; }
+.winner-section-title {
+    font-weight: 800;
+    color: #0f766e;
+    background: linear-gradient(135deg, #99f6e4, #6ee7b7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 0.95rem;
+    margin: 4px 0 6px 0;
+}
+.collapsible {
+    border: 1px dashed #e5e7eb;
+    border-radius: 12px;
+    background: #fafafa;
+}
+.collapsible-header {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-weight: 700;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.collapsible-header .chevron { font-size: 14px; }
+.collapsible-header .count { color: #6b7280; font-weight: 600; }
+.collapsible-content { padding: 10px; }
+
 .question-card {
     background: #ffffff;
     border: 1px solid #e5e7eb;
@@ -585,10 +704,17 @@ body {
     box-shadow: 0 20px 35px -15px rgba(0, 0, 0, 0.2);
 }
 
+/* Tournament winner highlight */
+.question-card.tournament-winner {
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16,185,129,0.3), 0 10px 25px -10px rgba(16,185,129,0.35);
+}
+
 .question-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 8px;
     margin-bottom: 12px;
 }
 
@@ -607,6 +733,32 @@ body {
 .engine-tag.anthropic { background: #8b5cf6; }
 .engine-tag.xai { background: #f59e0b; color: #111827; }
 
+/* Engine pill for tables/badges */
+.engine-pill {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+}
+.engine-pill.gpt { background: #10a37f; }
+.engine-pill.gemini { background: #4285f4; }
+.engine-pill.anthropic { background: #8b5cf6; }
+.engine-pill.xai { background: #f59e0b; color: #111827; }
+
+/* Chips for per-evaluator small badges */
+.eval-chip {
+    display: inline-block;
+    background: #eef2ff;
+    color: #3730a3;
+    padding: 2px 6px;
+    margin: 2px 4px 2px 0;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
 .question-meta {
     display: flex;
     gap: 8px;
@@ -614,6 +766,42 @@ body {
     font-size: 0.75rem;
     color: #6b7280;
 }
+.question-meta { margin-left: auto; }
+
+/* Winner icon next to engine tag */
+.winner-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #fde68a 0%, #f59e0b 60%, #b45309 100%);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 4px 10px rgba(245, 158, 11, 0.35);
+}
+.winner-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: #fff;
+}
+
+/* Ribbon-style winner badge placed next to engine */
+.winner-ribbon {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    height: 26px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    color: #fff;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
+}
+.winner-ribbon .ribbon-emoji { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); }
+.winner-ribbon .ribbon-text { font-size: 0.72rem; line-height: 1; }
 
 .status-badge {
     padding: 4px 8px;
@@ -792,6 +980,11 @@ body {
 }
 .votes-table thead th { color: #374151; text-align: left; }
 .engine-cell { font-weight: 700; color: #1f2937; white-space: nowrap; }
+
+/* Tournament table winner row */
+.tournament-table .winner-row {
+    background: #ecfeff;
+}
 
 /* Update banner */
 .update-banner {

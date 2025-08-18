@@ -92,18 +92,9 @@
                                 <label for="numQuestions" class="required">Number of Questions</label>
                                 <select id="numQuestions" name="numQuestions" required>
                                     <option value="1" selected>1</option>
-                                    <option value="2">2</option>
-                                    <option value="3">3</option>
-                                    <option value="4">4</option>
-                                    <option value="5">5</option>
-                                    <option value="6">6</option>
-                                    <option value="7">7</option>
-                                    <option value="8">8</option>
-                                    <option value="9">9</option>
-                                    <option value="10">10</option>
                                 </select>
                                 <div class="range-row">
-                                    <input type="range" id="numQuestionsRange" min="1" max="10" value="1" step="1" aria-label="Number of Questions">
+                                    <input type="range" id="numQuestionsRange" min="1" max="1" value="1" step="1" aria-label="Number of Questions">
                                     <span class="range-value" id="numQuestionsValue">1</span>
                                 </div>
                             </div>
@@ -163,6 +154,13 @@
                     
                     <!-- In Progress Questions -->
                     <div id="inProgressContainer" class="tab-content active">
+                        <!-- Tournament Results (latest generation) -->
+                        <div id="tournamentContainer" class="tournament-container">
+                            <div class="tournament-header">
+                                <h3>Latest Selection Round Results</h3>
+                            </div>
+                            <div id="tournamentResults"></div>
+                        </div>
                         <div class="question-slider" id="inProgressSlider">
                             <div class="questions-container">
                                 <p class="no-questions">No questions in progress. Use the form on the left to get started.</p>

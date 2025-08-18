@@ -120,13 +120,6 @@ class API {
             method: 'GET',
         });
     }
-
-    static async verifyQuestion(questionData) {
-        return this.request('/verify', {
-            method: 'POST',
-            body: JSON.stringify(questionData),
-        });
-    }
 }
 
 export default API;

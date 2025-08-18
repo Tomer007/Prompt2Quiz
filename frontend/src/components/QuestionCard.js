@@ -20,6 +20,7 @@ export default class QuestionCard {
         card.innerHTML = `
             <div class="question-header">
                 <div class="engine-tag ${this.question.engine}">${this.question.engine.toUpperCase()}</div>
+                <div class="winner-slot"></div>
                 <div class="question-meta">
                     <span class="status-badge ${statusClass}">${this.question.status}</span>
                     ${showVersion ? `<span>v${this.question.version}</span>` : ''}
@@ -67,19 +68,11 @@ export default class QuestionCard {
                     </button>
                     <button class="btn btn-success btn-small approve-btn" 
                             ${this.question.status === 'approved' ? 'disabled' : ''}>
-                        Approve & Add to CSV
+                        Approve
                     </button>
                     <button class="btn btn-danger btn-small delete-btn">
                         Delete
                     </button>
-                    <button class="btn btn-info btn-small validate-btn">
-                        Validate with AI
-                    </button>
-                </div>
-                
-                <!-- Validation Results -->
-                <div id="validation-results" class="validation-results" style="display: none;">
-                    <!-- Results will be populated here -->
                 </div>
 
                 <!-- Change Summary (after Improve) -->
@@ -104,13 +97,12 @@ export default class QuestionCard {
         const reviewBtn = this.element.querySelector('.review-btn');
         const approveBtn = this.element.querySelector('.approve-btn');
         const deleteBtn = this.element.querySelector('.delete-btn');
-        const validateBtn = this.element.querySelector('.validate-btn');
+        
         const commentTextarea = this.element.querySelector('.tutor-comment');
 
         reviewBtn.addEventListener('click', () => this.handleReview(commentTextarea));
         approveBtn.addEventListener('click', () => this.handleApprove());
         deleteBtn.addEventListener('click', () => this.handleDelete());
-        validateBtn.addEventListener('click', () => this.handleValidate());
     }
 
     async handleReview(commentTextarea) {
@@ -159,8 +151,9 @@ export default class QuestionCard {
     async handleApprove() {
         try {
             const approveBtn = this.element.querySelector('.approve-btn');
-            approveBtn.disabled = true;
-            approveBtn.textContent = 'Approving...';
+            // Disable all actions immediately to prevent duplicate clicks
+            this.setActionsDisabled(true);
+            if (approveBtn) approveBtn.textContent = 'Approving...';
 
             // First approve the question
             const approveResponse = await API.approveQuestion(this.question.id);
@@ -186,10 +179,10 @@ export default class QuestionCard {
         } catch (error) {
             console.error('Approval failed:', error);
             this.showNotification(`Approval failed: ${error.message}`, 'error');
-        } finally {
+            // Re-enable actions to allow retry on failure
+            this.setActionsDisabled(false);
             const approveBtn = this.element.querySelector('.approve-btn');
-            approveBtn.disabled = false;
-            approveBtn.textContent = 'Approved ✓';
+            if (approveBtn) approveBtn.textContent = 'Approve & Add to CSV';
         }
     }
 
@@ -223,132 +216,6 @@ export default class QuestionCard {
         }
     }
 
-    async handleValidate() {
-        try {
-            const validateBtn = this.element.querySelector('.validate-btn');
-            validateBtn.disabled = true;
-            validateBtn.textContent = 'Validating...';
-
-            // Prepare question data for verification
-            const questionData = {
-                id: this.question.id,
-                engine: this.question.engine,
-                exam_name: this.question.exam_name,
-                language: this.question.language,
-                question_type: this.question.question_type,
-                difficulty: this.question.difficulty,
-                question: this.question.question,
-                options: this.question.options,
-                answer: this.question.answer,
-                explanation: this.question.explanation
-            };
-
-            const response = await API.verifyQuestion(questionData);
-            
-            // Display validation results
-            this.displayValidationResults(response);
-            
-            this.showNotification('Question validated successfully!', 'success');
-            
-        } catch (error) {
-            console.error('Validation failed:', error);
-            this.showNotification(`Validation failed: ${error.message}`, 'error');
-        } finally {
-            const validateBtn = this.element.querySelector('.validate-btn');
-            validateBtn.disabled = false;
-            validateBtn.textContent = 'Validate with AI';
-        }
-    }
-
-    displayValidationResults(results) {
-        const validationResults = this.element.querySelector('#validation-results');
-        
-        if (!validationResults) return;
-        
-        const { model_votes = {}, aggregate, proposed_fix_hint } = results;
-        const verdictRaw = (aggregate.final_verdict || '').toLowerCase();
-        const verdictLabel = verdictRaw === 'approve'
-            ? 'Approved'
-            : verdictRaw === 'needs_revision'
-                ? 'Needs revision'
-                : verdictRaw === 'reject'
-                    ? 'Rejected'
-                    : aggregate.final_verdict;
-        
-        // Build per-engine votes rows
-        const formatConfidence = (c) => {
-            if (typeof c !== 'number') return '';
-            // If provider returns 0..1 show %, otherwise show as fixed
-            return c <= 1 ? `${Math.round(c * 100)}%` : c.toFixed(1);
-        };
-        const formatVerdict = (v) => {
-            const vr = (v || '').toLowerCase();
-            if (vr === 'approve') return 'Approved';
-            if (vr === 'needs_revision') return 'Needs revision';
-            if (vr === 'reject') return 'Rejected';
-            return v || '';
-        };
-        const votesRows = Object.entries(model_votes).map(([engine, vote]) => `
-            <tr>
-                <td class="engine-cell">${engine.toUpperCase()}</td>
-                <td>${(vote.score ?? '').toString()}</td>
-                <td>${formatVerdict(vote.verdict)}</td>
-                <td>${formatConfidence(vote.confidence)}</td>
-                <td>${(vote.issues || []).join(', ')}</td>
-            </tr>
-        `).join('');
-        
-        // Create the results HTML
-        const resultsHTML = `
-            ${votesRows ? `
-            <div class="validation-votes">
-                <div style="font-weight:600; margin-bottom:6px;">Per-engine results</div>
-                <table class="votes-table">
-                    <thead>
-                        <tr>
-                            <th>Engine</th>
-                            <th>Score</th>
-                            <th>Status</th>
-                            <th>Confidence</th>
-                            <th>Issues</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${votesRows}
-                    </tbody>
-                </table>
-            </div>` : ''}
-            <div class="validation-summary">
-                <div class="validation-row">
-                    <span class="validation-label">Mean score:</span>
-                    <span class="validation-value">${aggregate.mean_score}</span>
-                </div>
-                <div class="validation-row">
-                    <span class="validation-label">Solver agreement:</span>
-                    <span class="validation-value">${aggregate.solver_agreement ? 'Yes' : 'No'}</span>
-                </div>
-                <div class="validation-row">
-                    <span class="validation-label">Decision:</span>
-                    <span class="validation-value verdict-${verdictRaw}">${verdictLabel}</span>
-                </div>
-                ${aggregate.combined_issues.length > 0 ? `
-                    <div class="validation-row">
-                        <span class="validation-label">Issues:</span>
-                        <span class="validation-value">${aggregate.combined_issues.join(', ')}</span>
-                    </div>
-                ` : ''}
-                ${proposed_fix_hint ? `
-                    <div class="validation-row">
-                        <span class="validation-label">Fix hint:</span>
-                        <span class="validation-value">${proposed_fix_hint}</span>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        
-        validationResults.innerHTML = resultsHTML;
-        validationResults.style.display = 'block';
-    }
 
     showChangeSummary({ questionBefore, questionAfter, answerBefore, answerAfter, explanationBefore, explanationAfter, commentUsed }) {
         const container = this.element.querySelector('.change-summary');
@@ -390,14 +257,33 @@ export default class QuestionCard {
     updateCardStatus() {
         const statusBadge = this.element.querySelector('.status-badge');
         const approveBtn = this.element.querySelector('.approve-btn');
+        const reviewBtn = this.element.querySelector('.review-btn');
+        const deleteBtn = this.element.querySelector('.delete-btn');
+        const commentTextarea = this.element.querySelector('.tutor-comment');
         
         statusBadge.className = `status-badge status-${this.question.status}`;
         statusBadge.textContent = this.question.status;
         
         if (this.question.status === 'approved') {
-            approveBtn.disabled = true;
-            approveBtn.textContent = 'Approved ✓';
+            if (approveBtn) {
+                approveBtn.disabled = true;
+                approveBtn.textContent = 'Approved ✓';
+            }
+            if (reviewBtn) reviewBtn.disabled = true;
+            if (deleteBtn) deleteBtn.disabled = true;
+            if (commentTextarea) commentTextarea.disabled = true;
         }
+    }
+
+    setActionsDisabled(disabled) {
+        const reviewBtn = this.element.querySelector('.review-btn');
+        const approveBtn = this.element.querySelector('.approve-btn');
+        const deleteBtn = this.element.querySelector('.delete-btn');
+        const commentTextarea = this.element.querySelector('.tutor-comment');
+        if (reviewBtn) reviewBtn.disabled = disabled;
+        if (approveBtn) approveBtn.disabled = disabled;
+        if (deleteBtn) deleteBtn.disabled = disabled;
+        if (commentTextarea) commentTextarea.disabled = disabled;
     }
 
  

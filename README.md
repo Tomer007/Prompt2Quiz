@@ -159,7 +159,7 @@ The app has three main tabs:
 
 #### 📝 In Progress
 - Shows draft and revised questions
-- Actions: Improve, Approve, Delete, Validate with AI
+- Actions: Improve, Approve, Delete
 
 #### ✅ Approved
 - Shows approved questions ready for export
@@ -172,7 +172,6 @@ The app has three main tabs:
 ### Question Actions
 
 - **Send Comment & Improve**: Add tutor feedback to get an improved version
-- **Validate with AI**: Get AI-powered quality assessment
 - **Approve & Add to CSV**: Mark question as approved and export to CSV
 - **Delete**: Soft-delete question (moves to Deleted tab)
 
@@ -203,7 +202,7 @@ Each question can be validated with AI to get:
 - `POST /export` - Export question to CSV
 - `GET /csv` - Download CSV file
 - `GET /questions` - Get questions by status
-- `POST /verify` - Validate question with AI
+<!-- /verify endpoint removed -->
 
 ## 🧪 Test the Setup
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 from datetime import datetime
 from enum import Enum
 
@@ -81,12 +81,20 @@ class ModelVote(BaseModel):
     confidence: float
 
 class VerificationResponse(BaseModel):
-    model_votes: dict[str, ModelVote]
-    aggregate: dict[str, Union[str, float, bool, List[str]]]
+    model_votes: Dict[str, ModelVote]
+    aggregate: Dict[str, Union[str, float, bool, List[str]]]
     proposed_fix_hint: Optional[str] = None
+
+# Ranked vote used in generation tournament
+class RankedVote(ModelVote):
+    rank: int
+    points: int
 
 class GenerateResponse(BaseModel):
     questions: List[Question]
+    # evaluations[question_id][engine] => RankedVote
+    evaluations: Optional[Dict[str, Dict[str, RankedVote]]] = None
+    winner_id: Optional[str] = None
 
 class ImproveResponse(BaseModel):
     question: Question
