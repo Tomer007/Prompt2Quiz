@@ -287,6 +287,56 @@ async def download_csv():
         logger.error(f"Error downloading CSV: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+@app.get('/csv/list')
+async def list_csv_files():
+    """List available CSV files under the data directory so users can choose which to download."""
+    try:
+        base_path = question_service.get_data_dir()
+        if not os.path.isdir(base_path):
+            return {"files": []}
+        files = []
+        for name in os.listdir(base_path):
+            if not name.lower().endswith('.csv'):
+                continue
+            full = os.path.join(base_path, name)
+            if not os.path.isfile(full):
+                continue
+            stat = os.stat(full)
+            files.append({
+                "filename": name,
+                "size_bytes": stat.st_size,
+                "modified_at": int(stat.st_mtime)
+            })
+        # Sort by modified desc
+        files.sort(key=lambda f: f["modified_at"], reverse=True)
+        return {"files": files}
+    except Exception as e:
+        logger.error(f"Error listing CSV files: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@app.get('/csv/file/{filename}')
+async def download_specific_csv(filename: str):
+    """Download a specific CSV file from the data directory by its filename (no paths)."""
+    try:
+        base_path = question_service.get_data_dir()
+        # Prevent directory traversal
+        safe_name = os.path.basename(filename)
+        target = os.path.join(base_path, safe_name)
+        if not os.path.isfile(target):
+            raise HTTPException(status_code=404, detail="CSV file not found")
+        return FileResponse(
+            path=target,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f"attachment; filename={safe_name}"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading specific CSV '{filename}': {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 @app.get("/questions")
 async def get_questions(status: Optional[str] = None):
     """Get questions in storage, optionally filtered by status"""

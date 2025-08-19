@@ -84,10 +84,6 @@ export default class DeletedQuestionCard {
     }
 
     async handleRestore() {
-        if (!confirm('Are you sure you want to restore this question?')) {
-            return;
-        }
-
         try {
             const restoreBtn = this.element.querySelector('.restore-btn');
             restoreBtn.disabled = true;
@@ -118,10 +114,6 @@ export default class DeletedQuestionCard {
     }
 
     handleRemovePermanently() {
-        if (!confirm('Are you sure you want to permanently remove this question? This action cannot be undone.')) {
-            return;
-        }
-
         // Remove the card from the DOM (client-side only)
         this.element.remove();
         

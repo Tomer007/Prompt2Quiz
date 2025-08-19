@@ -90,6 +90,30 @@ class API {
         document.body.removeChild(a);
     }
 
+    static async listCsvFiles() {
+        return this.request('/csv/list', { method: 'GET' });
+    }
+
+    static async downloadCsvFile(filename) {
+        const response = await fetch(`${API_BASE_URL}/csv/file/${encodeURIComponent(filename)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const dispo = response.headers.get('Content-Disposition') || '';
+        const match = dispo.match(/filename="?([^";]+)"?/i);
+        const suggested = match ? match[1] : filename || 'export.csv';
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = suggested;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
+
     static async getQuestions(status = null) {
         const endpoint = status ? `/questions?status=${status}` : '/questions';
         return this.request(endpoint, {

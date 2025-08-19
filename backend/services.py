@@ -14,7 +14,9 @@ class QuestionService:
     def __init__(self):
         logger.info("Initializing QuestionService...")
         self.questions: List[Question] = []
-        # Use one CSV file per day (UTC): ../data/export_YYYYMMDD.csv
+        # Resolve data directory to an absolute path next to the backend folder
+        self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+        # Use one CSV file per day (UTC): <data_dir>/export_YYYYMMDD.csv
         self.csv_file_path = self._current_csv_path_for_today()
         self._ensure_csv_directory()
         self._initialize_csv()
@@ -23,8 +25,8 @@ class QuestionService:
     def _ensure_csv_directory(self):
         """Ensure the CSV directory exists"""
         try:
-            os.makedirs(os.path.dirname(self.csv_file_path), exist_ok=True)
-            logger.debug(f"CSV directory ensured: {os.path.dirname(self.csv_file_path)}")
+            os.makedirs(self.data_dir, exist_ok=True)
+            logger.debug(f"CSV directory ensured: {self.data_dir}")
         except Exception as e:
             logger.error(f"Error creating CSV directory: {e}")
     
@@ -58,7 +60,7 @@ class QuestionService:
     def _current_csv_path_for_today(self) -> str:
         """Build the CSV path for today's date (UTC)."""
         today_str = datetime.now(timezone.utc).strftime('%Y%m%d')
-        return f"../data/export_{today_str}.csv"
+        return os.path.join(self.data_dir, f"export_{today_str}.csv")
 
     def _rotate_csv_if_new_day(self):
         """Ensure the CSV file path points to today's file; re-init if day changed."""
@@ -73,6 +75,12 @@ class QuestionService:
         """Public accessor that also rotates file at day boundaries."""
         self._rotate_csv_if_new_day()
         return self.csv_file_path
+
+    def get_data_dir(self) -> str:
+        """Absolute path to the data directory containing CSV files."""
+        # Ensure directory exists before returning
+        self._ensure_csv_directory()
+        return self.data_dir
     
     def _ensure_csv_bom(self):
         """Ensure CSV file has UTF-8 BOM for Hebrew support"""

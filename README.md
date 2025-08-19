@@ -8,9 +8,9 @@ A simple, clean AI practice question generator that works with multiple AI engin
 - **Multi-Language**: Questions can be generated in any language while keeping the UI in English
 - **Question Types**: Support for various question types (Numerical, Verbal, Fractions, Percents, Management, etc.)
 - **Smart Review Loop**: Add tutor comments to get improved versions of questions
-- **AI Validation**: Validate question quality with AI-powered assessment
+- **Selection Round (Tournament)**: Cross-evaluate candidates across engines, show per-engine scores, ranks, points, and winner
 - **Tabbed Interface**: Organize questions by status (In Progress, Approved, Deleted)
-- **CSV Export**: Export approved questions to CSV for further use
+- **CSV Export**: Export approved questions to CSV (one CSV per day) and download any historical CSV via a file picker
 - **Clean UI**: Minimal, functional design with no over-design or animations
 - **Single Server**: Consolidated frontend and backend in one server
 
@@ -148,8 +148,9 @@ XAI_BASE_URL=https://api.xai.com/v1
    - **Question Type**: e.g., Numerical, Verbal, Fractions, Percents, Management
    - **Difficulty**: 1-10 scale
    - **Notes**: Additional context for the AI
-   - **Number of Questions**: 1-50
    - **AI Engines**: Select GPT, Gemini, Anthropic, xAI, or any combination
+  
+  The app currently generates one candidate per selected engine per round (the form defaults to 1 request).
 
 2. Click "Generate Questions"
 
@@ -175,19 +176,17 @@ The app has three main tabs:
 - **Approve & Add to CSV**: Mark question as approved and export to CSV
 - **Delete**: Soft-delete question (moves to Deleted tab)
 
-### AI Validation
+### Selection Round Panel
 
-Each question can be validated with AI to get:
-- Quality score (1-10)
-- Verdict (approve/needs_revision/reject)
-- Issues identified
-- Proposed fix hints
+- After generating, a "Selection Round Results" panel appears above the in‑progress list.
+- Tabs: one tab per engine candidate (ordered by rank), plus a STATS tab.
+- Each candidate tab shows the full question card and an "Evaluations" table (per-engine scores, verdicts, confidence, issues).
 
 ### Export
 
-- **Download CSV**: Download all approved questions as a CSV file
-- CSV includes: exam_name, language, question_type, difficulty, engine, question, options, answer, explanation, version, approved_at
-- Supports Hebrew and other languages with UTF-8 BOM encoding
+- **Download CSV**: Click the "Download CSV" button to open a file picker listing all CSVs in the data directory (newest first). Select a file to download.
+- The backend writes one CSV per day (UTC): `export_YYYYMMDD.csv`.
+- CSV includes: `exam_name, language, question_type, difficulty, engine, question, options, answer, explanation, version, approved_at` and uses UTF‑8 BOM for Hebrew support.
 
 ## 🔌 API Endpoints
 
@@ -200,7 +199,9 @@ Each question can be validated with AI to get:
 - `POST /delete` - Soft-delete a question
 - `POST /undelete` - Restore a deleted question
 - `POST /export` - Export question to CSV
-- `GET /csv` - Download CSV file
+- `GET /csv` - Download today's CSV file
+- `GET /csv/list` - List available CSV files
+- `GET /csv/file/{filename}` - Download a specific CSV file by name
 - `GET /questions` - Get questions by status
 <!-- /verify endpoint removed -->
 
@@ -213,18 +214,16 @@ Each question can be validated with AI to get:
 3. **Question Type**: Fractions
 4. **Difficulty**: 5
 5. **Notes**: Basic fraction operations
-6. **Number of Questions**: 3
-7. **AI Engines**: GPT (uncheck others if you don't have the keys)
+6. **AI Engines**: GPT (uncheck others if you don't have the keys)
 
-Click "Generate Questions" and wait for the AI to create questions.
+Click "Generate Questions" (or press Enter in the form; Ctrl/Cmd+Enter in the notes textarea) and wait for the AI to create questions.
 
 ### Expected Results
 
-- 3 questions should appear in cards below the form
-- Each card shows the question, answer, explanation, and status
-- You can add tutor comments and request improvements
-- You can validate questions with AI
-- You can approve questions and export them to CSV
+- Candidate question cards appear in the Selection Round tabs (winner first), and the in‑progress list reflects your current queue.
+- Each card shows the question, answer, explanation, and status.
+- You can add tutor comments and request improvements.
+- You can approve questions and export them to CSV.
 
 ## 🔧 Troubleshooting
 

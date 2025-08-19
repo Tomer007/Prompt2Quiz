@@ -1,8 +1,9 @@
 import API from '../api.js';
 
 export default class QuestionCard {
-    constructor(question) {
+    constructor(question, evaluations = null) {
         this.question = question;
+        this.evaluations = evaluations; // optional per-question evaluations (by engine)
         this.element = null;
         this.render();
     }
@@ -53,6 +54,7 @@ export default class QuestionCard {
                 <div class="question-explanation" style="margin-top:6px;">
                     <strong>Improvement notes:</strong> ${this.escapeHtml(this.question.improvement_explanation)}
                 </div>` : ''}
+                ${this.renderEvaluationsBlock()}
             </div>
 
             <div class="question-actions">
@@ -84,6 +86,55 @@ export default class QuestionCard {
 
         this.element = card;
         this.attachEventListeners();
+    }
+
+    renderEvaluationsBlock() {
+        try {
+            const votes = this.evaluations || {};
+            const entries = Object.entries(votes);
+            if (!entries || entries.length === 0) return '';
+            const formatConfidence = (c) => {
+                if (typeof c !== 'number') return '';
+                return c <= 1 ? `${Math.round(c * 100)}%` : c.toFixed(1);
+            };
+            const formatVerdict = (v) => {
+                const vr = (v || '').toLowerCase();
+                if (vr === 'approve') return 'Approved';
+                if (vr === 'needs_revision') return 'Needs revision';
+                if (vr === 'reject') return 'Rejected';
+                return v || '';
+            };
+            const rows = entries.map(([engine, vote]) => `
+                <tr>
+                    <td class="engine-cell">${(engine || '').toString().toUpperCase()}</td>
+                    <td>${(vote && vote.score != null) ? vote.score : ''}</td>
+                    <td>${formatVerdict(vote && vote.verdict)}</td>
+                    <td>${formatConfidence(vote && vote.confidence)}</td>
+                    <td>${(vote && vote.issues ? vote.issues : []).join(', ')}</td>
+                </tr>
+            `).join('');
+            return `
+                <div class="validation-results" style="margin-top:10px;">
+                    <div style="font-weight:600; margin-bottom:6px;">Evaluations</div>
+                    <table class="votes-table">
+                        <thead>
+                            <tr>
+                                <th>Engine</th>
+                                <th>Score</th>
+                                <th>Status</th>
+                                <th>Confidence</th>
+                                <th>Issues</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } catch (_) {
+            return '';
+        }
     }
 
     getContentDirectionClass() {
@@ -187,10 +238,6 @@ export default class QuestionCard {
     }
 
     async handleDelete() {
-        if (!confirm('Are you sure you want to delete this question?')) {
-            return;
-        }
-
         try {
             const deleteBtn = this.element.querySelector('.delete-btn');
             deleteBtn.disabled = true;

@@ -162,7 +162,7 @@ Always return output as a single, strictly valid JSON object using the following
 
 {
   "question": "string",
-  "options": ["A", "B", "C", "D"], 
+  
   "answer": "string",
   "explanation": "string"
 }

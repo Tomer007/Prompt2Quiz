@@ -42,7 +42,21 @@ export default class App {
         const tabBtns = document.querySelectorAll('.tab-btn');
 
         generateForm.addEventListener('submit', (e) => this.handleGenerateSubmit(e));
-        downloadCsvBtn.addEventListener('click', () => this.handleDownloadCSV());
+        // Quick submit on Enter: submit when pressing Enter in inputs/selects; in textarea require Ctrl/Cmd+Enter
+        generateForm.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const tag = (e.target && e.target.tagName) || '';
+            const isTextarea = tag === 'TEXTAREA';
+            const shouldSubmit = (!isTextarea && !e.shiftKey) || (isTextarea && (e.metaKey || e.ctrlKey));
+            if (!shouldSubmit) return;
+            e.preventDefault();
+            if (typeof generateForm.requestSubmit === 'function') {
+                generateForm.requestSubmit();
+            } else {
+                generateForm.submit();
+            }
+        });
+        downloadCsvBtn.addEventListener('click', () => this.openCsvPicker());
         // No hide button; panel is always visible when data exists
         
         // Tab switching
@@ -150,7 +164,7 @@ export default class App {
             question_type: formData.get('questionType'),
             difficulty: parseInt(formData.get('difficulty')),
             notes: formData.get('notes'),
-            num_questions: parseInt(formData.get('numQuestions')),
+            num_questions: 1,
             engines: formData.getAll('engines')
         };
 
@@ -275,6 +289,36 @@ export default class App {
             const container = document.getElementById('tournamentContainer');
             const host = document.getElementById('tournamentResults');
             if (!container || !host) return;
+            // Update header with structured badges for request context
+            try {
+                const headerEl = container.querySelector('.tournament-header');
+                const titleEl = headerEl ? headerEl.querySelector('h3') : null;
+                if (headerEl && titleEl) {
+                    const req = this.lastRequest || {};
+                    const engines = (req.engines || []).map(e => (e || '').toString().toUpperCase());
+                    const requested = (req.num_questions != null ? req.num_questions : 1);
+                    const notes = (req.notes || '').toString().trim();
+                    // Title text (keep gradient only on title)
+                    titleEl.textContent = 'Selection Round Results';
+                    // Build meta markup outside the h3 to avoid gradient affecting text
+                    const metaHtml = `
+                        <div class="sr-meta">
+                            <span class="sr-chip"><span class="k">Exam</span><span class="v">${this.escapeHtml ? this.escapeHtml(req.exam_name || '—') : (req.exam_name || '—')}</span></span>
+                            <span class="sr-chip"><span class="k">Language</span><span class="v">${this.escapeHtml ? this.escapeHtml(req.language || '—') : (req.language || '—')}</span></span>
+                            <span class="sr-chip"><span class="k">Type</span><span class="v">${this.escapeHtml ? this.escapeHtml(req.question_type || '—') : (req.question_type || '—')}</span></span>
+                            <span class="sr-chip"><span class="k">Difficulty</span><span class="v">${(req.difficulty != null ? req.difficulty : '—')}</span></span>
+                        </div>
+                        ${notes ? `<div class="sr-notes"><span class="k">Notes:</span> <span class="v">${this.escapeHtml ? this.escapeHtml(notes) : notes}</span></div>` : ''}
+                    `;
+                    let metaWrap = headerEl.querySelector('.sr-meta-wrap');
+                    if (!metaWrap) {
+                        metaWrap = document.createElement('div');
+                        metaWrap.className = 'sr-meta-wrap';
+                        headerEl.appendChild(metaWrap);
+                    }
+                    metaWrap.innerHTML = metaHtml;
+                }
+            } catch (_) {}
             
             const evaluations = this.lastEvaluations;
             if (!evaluations || Object.keys(evaluations).length === 0) {
@@ -285,15 +329,21 @@ export default class App {
                 container.classList.remove('is-empty');
             }
             
-            // Build ordered candidate list (winner first), with full question objects
+            // Build ordered candidate list by overall rank: total points desc, then mean score desc
             const byId = {};
             (this.inProgressQuestions || []).forEach(q => { if (q && q.id) byId[q.id] = q; });
-            const winnerId = this.lastWinnerId;
+            const idToEngine = {};
+            (latestQuestions || []).forEach(q => { if (q && q.id) idToEngine[q.id] = (q.engine || '').toString(); });
             const candidateIds = Object.keys(evaluations);
-            const orderedIds = [
-                ...candidateIds.filter(id => id === winnerId),
-                ...candidateIds.filter(id => id !== winnerId)
-            ];
+            const rankingRows = candidateIds.map((qid) => {
+                const votes = evaluations[qid] || {};
+                const voteList = Object.values(votes);
+                const totalPoints = voteList.reduce((acc, v) => acc + (Number(v.points) || 0), 0);
+                const scores = voteList.map(v => Number(v.score) || 0);
+                const meanScore = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+                return { qid, engine: idToEngine[qid] || '', totalPoints, meanScore };
+            }).sort((a, b) => (b.totalPoints - a.totalPoints) || (b.meanScore - a.meanScore) || a.qid.localeCompare(b.qid));
+            const orderedIds = rankingRows.map(r => r.qid);
             const candidates = orderedIds.map(id => byId[id]).filter(Boolean);
 
             // Build tabs UI (candidate tabs + Stats tab)
@@ -301,12 +351,11 @@ export default class App {
             const tabBtnsHtml = candidates.map((q, idx) => {
                 const engine = (q.engine || '').toString().toUpperCase();
                 return `<button class="mini-tab-btn ${idx === 0 ? 'active' : ''}" data-tab="${tabsId}-${idx}"><span class="engine-pill ${q.engine}">${engine}</span></button>`;
-            }).join('') + `<button class="mini-tab-btn" data-tab="${tabsId}-stats"><span class="mini-tab-label">STATS</span></button>` + `<button class="mini-tab-btn" data-tab="${tabsId}-query"><span class="mini-tab-label">QUERY</span></button>`;
+            }).join('') + `<button class="mini-tab-btn" data-tab="${tabsId}-stats"><span class="mini-tab-label">STATS</span></button>`;
             const tabContentsHtml = candidates.map((q, idx) => `
                 <div id="${tabsId}-${idx}" class="mini-tab-content ${idx === 0 ? 'active' : ''}"></div>
             `).join('') + `
                 <div id="${tabsId}-stats" class="mini-tab-content"></div>
-                <div id="${tabsId}-query" class="mini-tab-content"></div>
             `;
 
             host.innerHTML = `
@@ -316,11 +365,12 @@ export default class App {
                 </div>
             `;
 
-            // Mount QuestionCard in each tab content
+            // Mount QuestionCard in each tab content; pass per-question evaluations if available
             candidates.forEach((q, idx) => {
                 const mount = host.querySelector(`#${tabsId}-${idx}`);
                 if (!mount) return;
-                const card = new QuestionCard(q);
+                const evalsForQuestion = (evaluations && q && q.id) ? evaluations[q.id] : null;
+                const card = new QuestionCard(q, evalsForQuestion);
                 mount.appendChild(card.getElement());
             });
 
@@ -402,29 +452,7 @@ export default class App {
                 // ignore stats render errors
             }
 
-            // Render user input query/settings inside query tab
-            try {
-                const queryMount = host.querySelector(`#${tabsId}-query`);
-                if (queryMount) {
-                    const req = this.lastRequest || {};
-                    const engines = (req.engines || []).map(e => e.toString().toUpperCase()).join(', ');
-                    const details = {
-                        Exam: req.exam_name,
-                        Language: req.language,
-                        Type: req.question_type,
-                        Difficulty: typeof req.difficulty === 'number' ? req.difficulty : (req.difficulty || ''),
-                        Notes: req.notes || '',
-                        Engines: engines,
-                        Requested: (req.num_questions != null ? req.num_questions : ''),
-                    };
-                    const rows = Object.entries(details).map(([k, v]) => `
-                        <div class="query-row"><span class="query-key">${k}:</span><span class="query-val">${this.escapeHtml ? this.escapeHtml(String(v)) : String(v)}</span></div>
-                    `).join('');
-                    queryMount.innerHTML = `<div class="query-details">${rows}</div>`;
-                }
-            } catch (_) {
-                // ignore
-            }
+            // Query tab removed
         } catch (err) {
             console.error('Failed to render tournament results:', err);
         }
@@ -537,7 +565,15 @@ export default class App {
         const approvedCount = document.getElementById('approvedCount');
         const deletedCount = document.getElementById('deletedCount');
         
-        inProgressCount.textContent = this.inProgressQuestions.length;
+        // If selection round results are being shown, reflect only the candidates
+        // that are still in the in-progress list (i.e., not approved/deleted yet)
+        let visibleInProgressCount = this.inProgressQuestions.length;
+        const evalKeys = this.lastEvaluations ? Object.keys(this.lastEvaluations) : null;
+        if (evalKeys && evalKeys.length > 0) {
+            const evalSet = new Set(evalKeys);
+            visibleInProgressCount = this.inProgressQuestions.filter(q => q && evalSet.has(q.id)).length;
+        }
+        inProgressCount.textContent = visibleInProgressCount;
         approvedCount.textContent = this.approvedQuestions.length;
         deletedCount.textContent = this.deletedQuestions.length;
     }
@@ -555,6 +591,8 @@ export default class App {
         
         // Show success message
         this.showNotification('Question approved and added to CSV!', 'success');
+        // Refresh in-progress from server to reflect current queue
+        this.refreshInProgressAndRender();
     }
 
     handleQuestionUnapproved(question) {
@@ -570,6 +608,8 @@ export default class App {
         
         // Show success message
         this.showNotification('Question approval undone successfully!', 'success');
+        // Refresh in-progress from server
+        this.refreshInProgressAndRender();
     }
 
     handleQuestionDeleted(question) {
@@ -585,6 +625,8 @@ export default class App {
         
         // Show success message
         this.showNotification('Question deleted successfully!', 'success');
+        // Refresh in-progress from server
+        this.refreshInProgressAndRender();
     }
 
     handleQuestionRestored(question) {
@@ -600,6 +642,8 @@ export default class App {
         
         // Show success message
         this.showNotification('Question restored successfully!', 'success');
+        // Refresh in-progress from server
+        this.refreshInProgressAndRender();
     }
 
     handleQuestionRemovedPermanently(question) {
@@ -612,6 +656,23 @@ export default class App {
         
         // Show success message
         this.showNotification('Question removed permanently!', 'success');
+    }
+
+    async refreshInProgressAndRender() {
+        try {
+            const inProgressResponse = await API.getQuestions('in_progress');
+            this.inProgressQuestions = this.sortNewestFirst(inProgressResponse.questions);
+            // Only re-render the in-progress section to avoid heavy DOM work
+            this.renderInProgressQuestions();
+            this.updateTabCounts();
+            // Also re-render the selection round panel so removed/approved items disappear from tabs
+            if (this.lastEvaluations) {
+                this.renderTournamentResults(this.inProgressQuestions);
+                this.highlightTournamentWinner();
+            }
+        } catch (err) {
+            console.error('Failed to refresh in-progress questions:', err);
+        }
     }
 
     async handleDownloadCSV() {
@@ -631,6 +692,57 @@ export default class App {
             const downloadBtn = document.getElementById('downloadCsvBtn');
             downloadBtn.disabled = false;
             downloadBtn.textContent = 'Download CSV';
+        }
+    }
+
+    async openCsvPicker() {
+        try {
+            const list = await API.listCsvFiles();
+            const files = (list && list.files) || [];
+            // Build a simple modal/popup list
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1100;display:flex;align-items:center;justify-content:center;';
+            const modal = document.createElement('div');
+            modal.style.cssText = 'background:#fff;border-radius:12px;min-width:320px;max-width:640px;width:90%;max-height:70vh;overflow:auto;box-shadow:0 20px 40px rgba(0,0,0,0.2);padding:16px;';
+            modal.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div style="font-weight:800;color:#1e293b;">Download CSV</div>
+                    <button id="csvPickerClose" class="btn" style="background:#e5e7eb;color:#111827;padding:6px 10px;">Close</button>
+                </div>
+                ${files.length === 0 ? '<div style="color:#6b7280;">No CSV files found.</div>' : ''}
+                <div>
+                    ${files.map(f => `
+                        <div class="csv-row" data-fn="${f.filename}" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:6px 0;cursor:pointer;">
+                            <div>
+                                <div style="font-weight:700;color:#111827;">${f.filename}</div>
+                                <div style="font-size:12px;color:#6b7280;">${new Date((f.modified_at||0)*1000).toLocaleString()} • ${(f.size_bytes||0).toLocaleString()} bytes</div>
+                            </div>
+                            <div class="btn btn-secondary btn-small">Download</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const close = () => { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); };
+            modal.querySelector('#csvPickerClose')?.addEventListener('click', close);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+            modal.querySelectorAll('.csv-row').forEach(row => {
+                row.addEventListener('click', async () => {
+                    const fn = row.getAttribute('data-fn');
+                    try {
+                        await API.downloadCsvFile(fn);
+                        close();
+                    } catch (err) {
+                        console.error('CSV download failed:', err);
+                        this.showNotification(`CSV download failed: ${err.message}`, 'error');
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Failed to list CSV files:', error);
+            this.showNotification(`Failed to list CSV files: ${error.message}`, 'error');
         }
     }
 

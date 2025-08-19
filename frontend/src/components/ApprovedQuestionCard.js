@@ -83,10 +83,6 @@ export default class ApprovedQuestionCard {
     }
 
     async handleUndo() {
-        if (!confirm('Are you sure you want to undo approval for this question?')) {
-            return;
-        }
-
         try {
             const undoBtn = this.element.querySelector('.undo-btn');
             undoBtn.disabled = true;
