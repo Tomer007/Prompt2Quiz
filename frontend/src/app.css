@@ -50,6 +50,12 @@ body {
     margin-bottom: 12px;
 }
 
+.header .version {
+    color: #475569;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
 .brand-badge {
     display: inline-block;
     background: linear-gradient(135deg, #3b82f6, #1d4ed8);
