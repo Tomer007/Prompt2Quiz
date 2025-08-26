@@ -6,7 +6,7 @@ import asyncio
 import random
 from typing import List, Optional, Dict, Tuple
 from datetime import datetime, timezone
-from schemas import Question, EngineType
+from schemas import Question, EngineType, QuestionStatus
 from providers import OpenAIProvider, GeminiProvider, AnthropicProvider, XAIProvider
 
 # Configure logging for services
@@ -532,7 +532,7 @@ class QuestionService:
             logger.error(f"Cannot approve question - not found: {question_id}")
             return None
         
-        question.status = "approved"
+        question.status = QuestionStatus.approved
         question.updated_at = datetime.now(timezone.utc)
         
         # Update in storage
@@ -553,11 +553,11 @@ class QuestionService:
             logger.error(f"Cannot delete question - not found: {question_id}")
             return False
         
-        if question.status == "deleted":
+        if question.status == QuestionStatus.deleted:
             logger.warning(f"Question {question_id[:8]}... is already deleted")
             return True
         
-        question.status = "deleted"
+        question.status = QuestionStatus.deleted
         question.deleted_at = datetime.now(timezone.utc)
         question.updated_at = datetime.now(timezone.utc)
         
@@ -580,7 +580,7 @@ class QuestionService:
             return False
         
         # STRICT VALIDATION: Only approved questions can be exported
-        if question.status != "approved":
+        if question.status != QuestionStatus.approved:
             logger.error(f"SECURITY VIOLATION: Attempted to export non-approved question {question_id[:8]}... - status is {question.status}, not approved")
             return False
         
@@ -625,7 +625,7 @@ class QuestionService:
             return False
         
         # Only approved questions can be exported
-        return question.status == "approved"
+        return question.status == QuestionStatus.approved
 
     def verify_question(self, item_payload: dict) -> dict:
         """Run verification via configured providers and return aggregated result"""
@@ -729,13 +729,13 @@ class QuestionService:
         """Get questions filtered by status"""
         if status == "in_progress":
             # in_progress includes draft and revised questions
-            filtered_questions = [q for q in self.questions if q.status in ["draft", "revised"]]
+            filtered_questions = [q for q in self.questions if q.status in [QuestionStatus.draft, QuestionStatus.revised]]
             logger.debug(f"Returning {len(filtered_questions)} in-progress questions")
         elif status == "approved":
-            filtered_questions = [q for q in self.questions if q.status == "approved"]
+            filtered_questions = [q for q in self.questions if q.status == QuestionStatus.approved]
             logger.debug(f"Returning {len(filtered_questions)} approved questions")
         elif status == "deleted":
-            filtered_questions = [q for q in self.questions if q.status == "deleted"]
+            filtered_questions = [q for q in self.questions if q.status == QuestionStatus.deleted]
             logger.debug(f"Returning {len(filtered_questions)} deleted questions")
         else:
             # Return all questions if status is not recognized
@@ -753,11 +753,11 @@ class QuestionService:
             logger.error(f"Cannot unapprove question - not found: {question_id}")
             return None
         
-        if question.status != "approved":
+        if question.status != QuestionStatus.approved:
             logger.error(f"Cannot unapprove question {question_id[:8]}... - status is {question.status}, not approved")
             return None
         
-        question.status = "revised"
+        question.status = QuestionStatus.revised
         question.updated_at = datetime.now(timezone.utc)
         
         # Update in storage
@@ -778,11 +778,11 @@ class QuestionService:
             logger.error(f"Cannot undelete question - not found: {question_id}")
             return None
         
-        if question.status != "deleted":
+        if question.status != QuestionStatus.deleted:
             logger.error(f"Cannot undelete question {question_id[:8]}... - status is {question.status}, not deleted")
             return None
         
-        question.status = "revised"
+        question.status = QuestionStatus.revised
         question.deleted_at = None
         question.updated_at = datetime.now(timezone.utc)
         
