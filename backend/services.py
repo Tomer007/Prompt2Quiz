@@ -2,6 +2,8 @@ import csv
 import os
 import uuid
 import logging
+import asyncio
+import random
 from typing import List, Optional, Dict, Tuple
 from datetime import datetime, timezone
 from schemas import Question, EngineType
@@ -18,6 +20,8 @@ class QuestionService:
         self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
         # Use one CSV file per day (UTC): <data_dir>/export_YYYYMMDD.csv
         self.csv_file_path = self._current_csv_path_for_today()
+        # Provider cache for reuse (keep-alive clients/sessions)
+        self._provider_cache: Dict[EngineType, object] = {}
         self._ensure_csv_directory()
         self._initialize_csv()
         logger.info(f"QuestionService initialized with CSV path: {self.csv_file_path}")
@@ -114,7 +118,7 @@ class QuestionService:
 
         Flow:
         1) Each engine generates ONE candidate question.
-        2) Each engine evaluates ALL candidates (including its own) and produces a score.
+        2) Each engine evaluates ALL candidates (not including its own) and produces a score.
         3) For each evaluator, rank candidates by score (desc) and assign points N..1.
         4) Sum points across evaluators and declare a winner.
 
@@ -244,6 +248,232 @@ class QuestionService:
         logger.info(f"Winner: {winner_id}")
 
         return all_candidates, evaluations, winner_id
+
+    # -------------------------
+    # Async concurrent variant
+    # -------------------------
+    async def async_generate_questions(self, exam_name: str, language: str, question_type: str,
+                                       difficulty: int, notes: str, num_questions: int,
+                                       engines: List[EngineType]) -> Tuple[List[Question], Dict[str, Dict[str, dict]], Optional[str]]:
+        """Concurrent tournament-style generation and cross-evaluation using asyncio.
+
+        1) Generate one candidate per engine concurrently (provider.generate_questions in thread pool)
+        2) Evaluate all candidates concurrently (skip self-evaluation), with a global semaphore cap
+        3) Rank per-evaluator, assign points, then pick a winner by total points (tie-break by mean score)
+        """
+
+        logger.info(
+            "[async] Tournament generation for %s (%s, %s, difficulty %s) using engines: %s",
+            exam_name, language, question_type, difficulty, engines
+        )
+
+        def provider_for(engine: EngineType):
+            return self._get_provider(engine)
+
+        # Helper: run blocking call in thread with timeout and light retries
+        async def _to_thread_with_retry(callable_fn, *args, timeout: float = 30.0, retries: int = 1, jitter: float = 0.3):
+            attempt = 0
+            last_exc = None
+            while attempt <= retries:
+                try:
+                    return await asyncio.wait_for(asyncio.to_thread(callable_fn, *args), timeout=timeout)
+                except Exception as exc:  # timeout or provider error
+                    last_exc = exc
+                    if attempt >= retries:
+                        break
+                    # backoff with jitter
+                    await asyncio.sleep((2 ** attempt) * (0.5 + random.random() * jitter))
+                    attempt += 1
+            raise last_exc
+
+        # 1) Concurrent generation: one candidate per engine
+        async def _gen_one(engine: EngineType) -> Optional[Question]:
+            try:
+                provider = provider_for(engine)
+                generated = await _to_thread_with_retry(
+                    provider.generate_questions,
+                    exam_name, language, question_type, difficulty, notes, 1,
+                    timeout=40.0, retries=1,
+                )
+                if not generated:
+                    return None
+                q = generated[0]
+                logger.info("[async] Engine %s produced candidate %s", engine, q.id[:8])
+                return q
+            except Exception as e:
+                logger.error("[async] Error generating with %s: %s", engine, e, exc_info=True)
+                return None
+
+        gen_tasks = [asyncio.create_task(_gen_one(engine)) for engine in engines]
+        gen_results = await asyncio.gather(*gen_tasks)
+        candidates: Dict[EngineType, Question] = {}
+        for engine, res in zip(engines, gen_results):
+            if res is not None:
+                candidates[engine] = res
+
+        if not candidates:
+            logger.error("[async] No candidates were generated")
+            return [], {}, None
+
+        # 2) Concurrent cross-evaluation
+        engines_effective = list(candidates.keys())
+        num_cands = len(engines_effective)
+
+        def build_payload(question: Question) -> dict:
+            return {
+                "id": question.id,
+                "engine": question.engine,
+                "exam_name": question.exam_name,
+                "language": question.language,
+                "question_type": question.question_type,
+                "difficulty": question.difficulty,
+                "question": question.question,
+                "options": question.options,
+                "answer": question.answer,
+                "explanation": question.explanation,
+            }
+
+        # Global concurrency cap for verification calls
+        sem = asyncio.Semaphore(8)
+
+        async def _verify_one(evaluator: EngineType, cand: Question) -> Optional[Tuple[str, str, float, dict]]:
+            # returns (evaluator_name, qid, score, vote)
+            if evaluator == cand.engine:
+                return None  # skip self-evaluation
+            try:
+                eval_provider = provider_for(evaluator)
+            except Exception as e:
+                logger.warning("[async] Evaluator %s unavailable: %s", evaluator, e)
+                return None
+            async with sem:
+                try:
+                    parsed = await _to_thread_with_retry(
+                        eval_provider.verify_question,
+                        build_payload(cand),
+                        timeout=30.0, retries=1,
+                    )
+                    score = float(parsed.get("score", 0.0))
+                    vote = {
+                        "score": score,
+                        "verdict": str(parsed.get("verdict", "needs_revision")),
+                        "issues": parsed.get("issues", [])[:3] or [],
+                        "confidence": float(parsed.get("confidence", 0.0)),
+                    }
+                    return evaluator.value, cand.id, score, vote
+                except Exception as e:
+                    logger.warning("[async] Evaluator %s failed on %s: %s", evaluator, cand.id[:8], e)
+                    return None
+
+        verify_tasks = []
+        for evaluator in engines_effective:
+            for cand in candidates.values():
+                verify_tasks.append(asyncio.create_task(_verify_one(evaluator, cand)))
+
+        verify_results = await asyncio.gather(*verify_tasks)
+
+        # Fold results per evaluator to rank
+        per_evaluator: Dict[str, List[Tuple[str, float, dict]]] = {}
+        for item in verify_results:
+            if not item:
+                continue
+            evaluator_name, qid, score, vote = item
+            per_evaluator.setdefault(evaluator_name, []).append((qid, score, vote))
+
+        evaluations: Dict[str, Dict[str, dict]] = {}
+        for evaluator_name, rows in per_evaluator.items():
+            # rank by score desc, tie-break by question id
+            rows.sort(key=lambda t: (t[1], t[0]), reverse=True)
+            for rank_index, (qid, _score, vote) in enumerate(rows, start=1):
+                points = max(num_cands - rank_index + 1, 1)
+                vote_with_rank = {**vote, "rank": rank_index, "points": points}
+                evaluations.setdefault(qid, {})[evaluator_name] = vote_with_rank
+
+        # 3) Winner
+        totals: Dict[str, int] = {}
+        for qid, engine_votes in evaluations.items():
+            totals[qid] = sum(v.get("points", 0) for v in engine_votes.values())
+
+        if not totals:
+            logger.error("[async] No evaluations available; returning candidates without winner")
+            all_candidates = list(candidates.values())
+            self.questions.extend(all_candidates)
+            return all_candidates, evaluations, None
+
+        def mean_score(qid: str) -> float:
+            votes = evaluations.get(qid, {}).values()
+            scores = [v.get("score", 0.0) for v in votes]
+            return sum(scores) / len(scores) if scores else 0.0
+
+        winner_id = max(totals.keys(), key=lambda qid: (totals[qid], mean_score(qid), qid))
+
+        # Add to storage
+        all_candidates = list(candidates.values())
+        self.questions.extend(all_candidates)
+        logger.info("[async] Tournament winner: %s", winner_id[:8])
+        return all_candidates, evaluations, winner_id
+
+    # Provider reuse helper
+    def _get_provider(self, engine: EngineType):
+        cached = self._provider_cache.get(engine)
+        if cached is not None:
+            return cached
+        if engine == EngineType.gpt:
+            provider = OpenAIProvider()
+        elif engine == EngineType.gemini:
+            provider = GeminiProvider()
+        elif engine == EngineType.anthropic:
+            provider = AnthropicProvider()
+        elif engine == EngineType.xai:
+            provider = XAIProvider()
+        else:
+            raise ValueError(f"Unknown engine type: {engine}")
+        self._provider_cache[engine] = provider
+        return provider
+
+    async def _to_thread_with_retry(self, callable_fn, *args, timeout: float = 30.0, retries: int = 1, jitter: float = 0.3):
+        attempt = 0
+        last_exc = None
+        while attempt <= retries:
+            try:
+                return await asyncio.wait_for(asyncio.to_thread(callable_fn, *args), timeout=timeout)
+            except Exception as exc:
+                last_exc = exc
+                if attempt >= retries:
+                    break
+                await asyncio.sleep((2 ** attempt) * (0.5 + random.random() * jitter))
+                attempt += 1
+        raise last_exc
+
+    async def async_improve_question(self, question_id: str, comment: str = "") -> Optional[Question]:
+        """Improve a question using non-blocking provider call with timeout/retry, reusing provider client."""
+        logger.info(f"[async] Improving question {question_id[:8]}... with comment: {comment[:50]}...")
+        question = self.get_question_by_id(question_id)
+        if not question:
+            logger.error(f"[async] Cannot improve question - not found: {question_id}")
+            return None
+
+        try:
+            provider = self._get_provider(question.engine)
+            # Run blocking improve in thread with timeout/retry
+            improved_question = await self._to_thread_with_retry(
+                provider.improve_question,
+                question,
+                comment,
+                timeout=40.0,
+                retries=1,
+            )
+
+            # Update storage
+            for i, q in enumerate(self.questions):
+                if q.id == question_id:
+                    self.questions[i] = improved_question
+                    break
+
+            logger.info(f"[async] Question {question_id[:8]}... improved successfully to version {improved_question.version}")
+            return improved_question
+        except Exception as e:
+            logger.error(f"[async] Error improving question {question_id[:8]}...: {e}", exc_info=True)
+            return None
     
     def get_question_by_id(self, question_id: str) -> Optional[Question]:
         """Get a question by its ID"""

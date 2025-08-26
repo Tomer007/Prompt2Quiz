@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuizBuilder AI – User Guide</title>
+    <link rel="stylesheet" href="/static/src/app.css" />
+    <style>
+        .guide-container { max-width: 980px; margin: 24px auto; background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:24px; }
+        .guide-container h1 { font-size: 1.6rem; margin-bottom: 6px; color:#1e293b; }
+        .guide-container h2 { font-size: 1.1rem; margin-top: 18px; margin-bottom: 8px; color:#1f2937; }
+        .guide-container p { color:#374151; margin: 6px 0; }
+        .guide-container ul { margin: 6px 0 6px 18px; color:#374151; }
+        .note { background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; margin:10px 0; }
+        .link-row { display:flex; gap:10px; margin-top: 16px; }
+        .link-btn { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color:#fff; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; }
+        .muted { color:#6b7280; }
+        .kbd { background:#111827; color:#fff; padding:2px 6px; border-radius:6px; font-size: .85em; }
+    </style>
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="robots" content="noindex" />
+    <meta name="description" content="How to use QuizBuilder AI – quick start and tips" />
+    <meta name="theme-color" content="#1d4ed8" />
+</head>
+<body>
+    <div class="guide-container">
+        <h1>QuizBuilder AI – User Guide</h1>
+        <p class="muted">Create, compare, and approve AI‑generated practice questions – fast.</p>
+
+        <div class="note">
+            <strong>Tip:</strong> Press <span class="kbd">Enter</span> to generate. Inside the notes box use <span class="kbd">Cmd/⌘ + Enter</span> (Mac) or <span class="kbd">Ctrl + Enter</span> (Windows/Linux).
+        </div>
+
+        <h2>1) Generate</h2>
+        <ul>
+            <li>Select <strong>Exam</strong>, <strong>Language</strong>, <strong>Type</strong>, and <strong>Difficulty</strong>.</li>
+            <li>(Optional) Add <strong>Notes</strong> to guide the models.</li>
+            <li>Choose the <strong>models</strong> (GPT / Gemini / Anthropic / xAI).</li>
+            <li>Click <strong>Generate</strong> (or press Enter).</li>
+        </ul>
+
+        <h2>2) Review the Selection Round</h2>
+        <p>After generation, a <strong>Selection Round Results</strong> panel appears above the list:</p>
+        <ul>
+            <li>Tabs show each model’s candidate – ordered by final rank (winner first).</li>
+            <li>The <strong>STATS</strong> tab shows points, mean score, and per‑evaluator ranks.</li>
+            <li>Each candidate card includes an <strong>Evaluations</strong> table with per‑engine feedback.</li>
+        </ul>
+
+        <h2>3) Improve (optional)</h2>
+        <ul>
+            <li>Enter tutor feedback in the card’s comment box.</li>
+            <li>Click <strong>Send Comment &amp; Improve</strong> to revise the item.</li>
+        </ul>
+
+        <h2>4) Approve / Delete</h2>
+        <ul>
+            <li>Click <strong>Approve &amp; Add to CSV</strong> to mark the question approved and append it to today’s CSV.</li>
+            <li>Use <strong>Delete</strong> to move a question to the Deleted tab. You can restore it later.</li>
+        </ul>
+
+        <h2>5) Export</h2>
+        <ul>
+            <li>Click <strong>Download CSV</strong> to open a file picker of all CSVs in the data directory.</li>
+            <li>The app writes one CSV per day (UTC). Pick any file to download.</li>
+        </ul>
+
+        <h2>Troubleshooting</h2>
+        <ul>
+            <li><strong>Don’t see new UI changes?</strong> Hard refresh (Cmd/Shift/R on macOS).</li>
+            <li><strong>Missing files in the picker?</strong> Ensure the server can write to the data directory.</li>
+            <li><strong>API errors?</strong> Check the server logs and confirm your API keys/credits.</li>
+        </ul>
+
+        <h2>Contact</h2>
+        <p>Questions or suggestions? Email <a href="mailto:tomergur@gmail.com">tomergur@gmail.com</a>.</p>
+
+        <div class="link-row">
+            <a class="link-btn" href="/">Back to App</a>
+        </div>
+    </div>
+</body>
+</html>
+
+

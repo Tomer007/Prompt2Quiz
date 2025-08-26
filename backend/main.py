@@ -113,7 +113,8 @@ async def generate_questions(request: GenerateRequest):
     try:
         start_time = time.time()
         
-        questions, evaluations, winner_id = question_service.generate_questions(
+        # Use async concurrent pipeline
+        questions, evaluations, winner_id = await question_service.async_generate_questions(
             exam_name=request.exam_name,
             language=request.language,
             question_type=request.question_type,
@@ -156,7 +157,7 @@ async def improve_question(request: ImproveRequest):
     try:
         start_time = time.time()
         
-        improved_question = question_service.improve_question(
+        improved_question = await question_service.async_improve_question(
             question_id=request.question_id,
             comment=request.comment
         )
