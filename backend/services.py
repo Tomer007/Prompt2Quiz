@@ -459,8 +459,8 @@ class QuestionService:
                 provider.improve_question,
                 question,
                 comment,
-                timeout=40.0,
-                retries=1,
+                timeout=20.0,
+                retries=2,
             )
 
             # Update storage

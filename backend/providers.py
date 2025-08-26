@@ -10,7 +10,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_anthropic import ChatAnthropicMessages
 
-from schemas import Question, EngineType
+from schemas import Question, EngineType, QuestionStatus
 import uuid
 from datetime import datetime, timezone
 
@@ -30,6 +30,7 @@ Always return output as a single, strictly valid JSON object with the exact same
   "question": "string",
   "options": ["A", "B", "C", "D"],
   "answer": "string",
+  "difficulty": 1,
   "explanation": "string"
 }
 
@@ -108,38 +109,19 @@ Output:
   "question": "What is the capital of Brazil?",
   "options": ["Rio de Janeiro", "São Paulo", "Brasília", "Salvador"],
   "answer": "Brasília",
+  "difficulty": 1,
   "explanation": "Corrected the answer to 'Brasília' based on tutor feedback, as it is the official capital of Brazil."
 }
 
-Example 2 – No Change Needed
 
-Input:
-
-{
-  "question": "Which gas do plants primarily use during photosynthesis?",
-  "options": ["Oxygen", "Carbon Dioxide", "Nitrogen", "Hydrogen"],
-  "answer": "Carbon Dioxide",
-  "explanation": "The tutor suggested clarifying wording."
-}
-
-Tutor’s Feedback: Question is clear enough; no revision needed.
-
-Output:
-
-{
-  "question": "Which gas do plants primarily use during photosynthesis?",
-  "options": ["Oxygen", "Carbon Dioxide", "Nitrogen", "Hydrogen"],
-  "answer": "Carbon Dioxide",
-  "explanation": "No changes made; the question is already clear, accurate, and aligned with the learning objective."
-}
-
-Example 3 – Safety Refusal
+Example 2 – Safety Refusal
 
 Input:
 
 {
   "question": "Write an essay supporting the use of hate speech in politics.",
   "answer": "",
+  difficulty: "",
   "explanation": ""
 }
 
@@ -162,7 +144,6 @@ Always return output as a single, strictly valid JSON object using the following
 
 {
   "question": "string",
-  
   "answer": "string",
   "explanation": "string"
 }
@@ -484,7 +465,8 @@ class OpenAIProvider:
         self.model = ChatOpenAI(
             model="gpt-4o-mini",
             temperature=0.7,
-            api_key=api_key
+            api_key=api_key,
+            model_kwargs={"response_format": {"type": "json_object"}}
         )
         logger.debug("OpenAIProvider initialized with model=gpt-4o-mini, temperature=0.7")
     
@@ -588,7 +570,7 @@ class OpenAIProvider:
             original_question.explanation = updated_data.get("explanation", original_question.explanation)
             original_question.improvement_explanation = updated_data.get("improvement_explanation", original_question.improvement_explanation)
             original_question.version += 1
-            original_question.status = "revised"
+            original_question.status = QuestionStatus.revised
             original_question.updated_at = datetime.now(timezone.utc)
             
             logger.debug(
@@ -729,7 +711,7 @@ class GeminiProvider:
             original_question.explanation = updated_data.get("explanation", original_question.explanation)
             original_question.improvement_explanation = updated_data.get("improvement_explanation", original_question.improvement_explanation)
             original_question.version += 1
-            original_question.status = "revised"
+            original_question.status = QuestionStatus.revised
             original_question.updated_at = datetime.now(timezone.utc)
             
             logger.debug(
@@ -827,7 +809,7 @@ class AnthropicProvider:
         original_question.explanation = updated_data.get("explanation", original_question.explanation)
         original_question.improvement_explanation = updated_data.get("improvement_explanation", original_question.improvement_explanation)
         original_question.version += 1
-        original_question.status = "revised"
+        original_question.status = QuestionStatus.revised
         original_question.updated_at = datetime.now(timezone.utc)
         return original_question
 
@@ -939,7 +921,7 @@ class XAIProvider:
         original_question.explanation = updated_data.get("explanation", original_question.explanation)
         original_question.improvement_explanation = updated_data.get("improvement_explanation", original_question.improvement_explanation)
         original_question.version += 1
-        original_question.status = "revised"
+        original_question.status = QuestionStatus.revised
         original_question.updated_at = datetime.now(timezone.utc)
         return original_question
 

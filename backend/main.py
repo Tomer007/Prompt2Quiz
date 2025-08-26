@@ -12,7 +12,8 @@ from typing import Optional
 from schemas import (
     GenerateRequest, GenerateResponse, ImproveRequest, ImproveResponse,
     ApproveRequest, ApproveResponse, DeleteRequest, DeleteResponse,
-    ExportRequest, ExportResponse, UnapproveRequest, UndeleteRequest
+    ExportRequest, ExportResponse, UnapproveRequest, UndeleteRequest,
+    EngineType
 )
 from services import QuestionService
 
@@ -463,6 +464,16 @@ async def startup_event():
     else:
         logger.warning("⚠️ ANTHROPIC_API_KEY not configured")
     
+    # Warm AI providers to reduce first-request latency
+    try:
+        question_service._get_provider(EngineType.gpt)
+        question_service._get_provider(EngineType.gemini)
+        question_service._get_provider(EngineType.anthropic)
+        question_service._get_provider(EngineType.xai)
+        logger.info("AI providers warmed")
+    except Exception as e:
+        logger.warning(f"Provider warm-up skipped: {e}")
+
     logger.info("🎉 QuizBuilder AI Backend startup complete!")
 
 @app.on_event("shutdown")
