@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in — JobTestPrep Prompt2Quiz</title>
+    <link rel="stylesheet" href="/static/src/app.css?v=20250826-1">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Sign in to JobTestPrep</h1>
+            <p class="subtitle">Enter your details to continue</p>
+            <p class="subtitle">Prompt2Quiz helps you generate, improve, approve, and export AI‑crafted exam questions.</p>
+            <p class="version">Version: 20250826-1</p>
+        </header>
+        <div class="main-layout" style="justify-content:center;">
+            <div class="questions-section" style="max-width:520px; width:100%;">
+                <form class="generate-form" method="post" action="/login">
+                    <div id="loginError" class="auth-error">Invalid password. Try again.</div>
+                    <div class="form-group">
+                        <label for="name" class="required">Name</label>
+                        <input id="name" name="name" type="text" required placeholder="Your name" autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label for="email" class="required">Email</label>
+                        <input id="email" name="email" type="email" required placeholder="you@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="password" class="required">Password</label>
+                        <input id="password" name="password" type="password" required placeholder="Enter password">
+                        <div class="auth-hint">Tip: use password <strong>noam</strong></div>
+                    </div>
+                    <div class="generate-footer">
+                        <button type="submit" class="btn btn-primary generate-btn">Login</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function(){
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('error') === '1') {
+                const el = document.getElementById('loginError');
+                if (el) el.style.display = 'block';
+            }
+        })();
+    </script>
+</body>
+</html>
+

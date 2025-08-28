@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import os
@@ -88,10 +88,53 @@ async def log_requests(request, call_next):
     return response
 
 @app.get("/")
-async def root():
-    """Serve the frontend index.html"""
+async def root(request: Request):
+    """Serve the frontend index.html (requires login)"""
     logger.info("Frontend index requested")
+    user_name = request.cookies.get("user_name")
+    user_email = request.cookies.get("user_email")
+    if not user_name or not user_email:
+        logger.info("No login cookie detected. Redirecting to /login")
+        return RedirectResponse(url="/login", status_code=303)
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+# Login pages
+@app.get("/login")
+async def login_page():
+    """Serve the login page"""
+    logger.info("Login page requested")
+    target = os.path.join(FRONTEND_DIR, "login.html")
+    if not os.path.exists(target):
+        raise HTTPException(status_code=404, detail="Login page not found")
+    return FileResponse(target)
+
+@app.post("/login")
+async def login_submit(name: str = Form(...), email: str = Form(...), password: str = Form(...)):
+    """Basic login: password must be 'noam'."""
+    try:
+        if password != "noam":
+            logger.warning("Login failed for %s", email)
+            return RedirectResponse(url="/login?error=1", status_code=303)
+        resp = RedirectResponse(url="/", status_code=303)
+        # Simple cookies for demo (not secure)
+        resp.set_cookie(key="user_name", value=name, httponly=False)
+        resp.set_cookie(key="user_email", value=email, httponly=False)
+        logger.info("Login success for %s", email)
+        return resp
+    except Exception as e:
+        logger.error(f"Login error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/logout")
+async def logout():
+    """Clear login cookies and redirect to login page."""
+    resp = RedirectResponse(url="/login", status_code=303)
+    try:
+        resp.delete_cookie("user_name")
+        resp.delete_cookie("user_email")
+    except Exception:
+        pass
+    return resp
 
 # Health check endpoint moved to /health
 @app.get("/health")
@@ -230,13 +273,15 @@ async def delete_question(request: DeleteRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/export", response_model=ExportResponse)
-async def export_question(request: ExportRequest):
+async def export_question(request: ExportRequest, http_request: Request):
     """Export an approved question to CSV"""
     logger.info(f"Export request received for question {request.question_id[:8]}...")
     
     try:
+        user_email = http_request.cookies.get("user_email")
         success = question_service.export_question_to_csv(
-            question_id=request.question_id
+            question_id=request.question_id,
+            user_email=user_email
         )
         
         if not success:
@@ -250,7 +295,7 @@ async def export_question(request: ExportRequest):
         
         return ExportResponse(
             success=True,
-            file_path=question_service.get_csv_file_path()
+            file_path=question_service.get_csv_file_path(user_email)
         )
         
     except HTTPException:
@@ -261,12 +306,13 @@ async def export_question(request: ExportRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/csv")
-async def download_csv():
+async def download_csv(http_request: Request):
     """Download the accumulated CSV file"""
     logger.info("CSV download request received")
     
     try:
-        csv_file_path = question_service.get_csv_file_path()
+        user_email = http_request.cookies.get("user_email")
+        csv_file_path = question_service.get_csv_file_path(user_email)
         
         if not os.path.exists(csv_file_path):
             logger.error("CSV file not found")
@@ -290,18 +336,23 @@ async def download_csv():
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get('/csv/list')
-async def list_csv_files():
+async def list_csv_files(http_request: Request):
     """List available CSV files under the data directory so users can choose which to download."""
     try:
         base_path = question_service.get_data_dir()
         if not os.path.isdir(base_path):
             return {"files": []}
         files = []
+        # Optionally filter by user email prefix
+        user_email = http_request.cookies.get("user_email")
+        user_prefix = question_service._safe_email_prefix(user_email)
         for name in os.listdir(base_path):
             if not name.lower().endswith('.csv'):
                 continue
             full = os.path.join(base_path, name)
             if not os.path.isfile(full):
+                continue
+            if user_prefix and not name.startswith(user_prefix + "_"):
                 continue
             stat = os.stat(full)
             files.append({
@@ -317,14 +368,15 @@ async def list_csv_files():
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get('/csv/file/{filename}')
-async def download_specific_csv(filename: str):
+async def download_specific_csv(filename: str, http_request: Request):
     """Download a specific CSV file from the data directory by its filename (no paths)."""
     try:
         base_path = question_service.get_data_dir()
+        user_prefix = question_service._safe_email_prefix(http_request.cookies.get("user_email"))
         # Prevent directory traversal
         safe_name = os.path.basename(filename)
         target = os.path.join(base_path, safe_name)
-        if not os.path.isfile(target):
+        if not os.path.isfile(target) or (user_prefix and not os.path.basename(target).startswith(user_prefix + "_")):
             raise HTTPException(status_code=404, detail="CSV file not found")
         return FileResponse(
             path=target,

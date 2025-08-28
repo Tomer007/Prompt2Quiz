@@ -77,6 +77,54 @@ body {
     flex: 1;
 }
 
+/* Auth page */
+.auth-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    flex: 1;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 520px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.2);
+    padding: 28px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.auth-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.auth-error {
+    display: none;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-weight: 700;
+}
+
+.auth-hint { color: #6b7280; font-size: 0.85rem; margin-top: 6px; }
+.auth-link { color: #3b82f6; font-weight: 700; text-decoration: none; }
+.auth-link:hover { text-decoration: underline; }
+
 /* Left Sidebar - Generate Questions */
 .left-sidebar {
     position: sticky;
@@ -558,6 +606,40 @@ body {
     box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);
 }
 #downloadCsvBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.45);
+}
+
+/* Match Logout to Download CSV */
+#logoutBtn {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);
+}
+#logoutBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.45);
+}
+
+/* Reusable blue button to match Download CSV */
+.btn-blue {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-blue:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 30px rgba(59, 130, 246, 0.45);
 }
@@ -1232,7 +1314,6 @@ body {
 
 .generate-footer {
   position: sticky; bottom: 0;
-  background: rgba(255,255,255,0.95);
   padding: 12px 0 4px; margin-top: 8px;
   border-top: 1px solid #e5e7eb;
 }

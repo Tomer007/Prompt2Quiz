@@ -18,7 +18,7 @@ class QuestionService:
         self.questions: List[Question] = []
         # Resolve data directory to an absolute path next to the backend folder
         self.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
-        # Use one CSV file per day (UTC): <data_dir>/export_YYYYMMDD.csv
+        # Default CSV file path; actual path may be per-user per day
         self.csv_file_path = self._current_csv_path_for_today()
         # Provider cache for reuse (keep-alive clients/sessions)
         self._provider_cache: Dict[EngineType, object] = {}
@@ -34,50 +34,59 @@ class QuestionService:
         except Exception as e:
             logger.error(f"Error creating CSV directory: {e}")
     
-    def _initialize_csv(self):
+    def _initialize_csv(self, file_path: Optional[str] = None):
         """Initialize CSV file with headers if it doesn't exist"""
         try:
-            if not os.path.exists(self.csv_file_path):
+            target_path = file_path or self.csv_file_path
+            if not os.path.exists(target_path):
                 headers = [
                     'exam_name', 'language', 'question_type', 'difficulty', 
                     'engine', 'question', 'options', 'answer', 'explanation', 
                     'version', 'approved_at'
                 ]
                 # Write with UTF-8 BOM for proper Hebrew support in Excel
-                with open(self.csv_file_path, 'wb') as csvfile:
+                with open(target_path, 'wb') as csvfile:
                     # Write UTF-8 BOM
                     csvfile.write(b'\xef\xbb\xbf')
                     # Convert to text mode for CSV writer
                     csvfile.close()
                     
-                with open(self.csv_file_path, 'a', newline='', encoding='utf-8') as csvfile:
+                with open(target_path, 'a', newline='', encoding='utf-8') as csvfile:
                     writer = csv.writer(csvfile)
                     writer.writerow(headers)
-                logger.info(f"CSV file initialized with UTF-8 BOM for Hebrew support: {self.csv_file_path}")
+                logger.info(f"CSV file initialized with UTF-8 BOM for Hebrew support: {target_path}")
             else:
                 # Check if existing CSV has BOM, add if missing
-                self._ensure_csv_bom()
-                logger.debug(f"CSV file already exists: {self.csv_file_path}")
+                self._ensure_csv_bom(target_path)
+                logger.debug(f"CSV file already exists: {target_path}")
         except Exception as e:
             logger.error(f"Error initializing CSV file: {e}")
 
-    def _current_csv_path_for_today(self) -> str:
-        """Build the CSV path for today's date (UTC)."""
-        today_str = datetime.now(timezone.utc).strftime('%Y%m%d')
-        return os.path.join(self.data_dir, f"export_{today_str}.csv")
+    def _safe_email_prefix(self, email: Optional[str]) -> str:
+        if not email:
+            return "export"
+        safe = ''.join(ch if ch.isalnum() else '_' for ch in email.strip().lower())
+        safe = safe.strip('_') or 'export'
+        return safe
 
-    def _rotate_csv_if_new_day(self):
-        """Ensure the CSV file path points to today's file; re-init if day changed."""
-        expected_path = self._current_csv_path_for_today()
+    def _current_csv_path_for_today(self, user_email: Optional[str] = None) -> str:
+        """Build the CSV path for today's date (UTC), optionally prefixed by user email."""
+        today_str = datetime.now(timezone.utc).strftime('%Y%m%d')
+        prefix = self._safe_email_prefix(user_email)
+        return os.path.join(self.data_dir, f"{prefix}_{today_str}.csv")
+
+    def _rotate_csv_if_new_day(self, user_email: Optional[str] = None):
+        """Ensure the CSV file path points to today's (per-user) file; re-init if day changed."""
+        expected_path = self._current_csv_path_for_today(user_email)
         if self.csv_file_path != expected_path:
             self.csv_file_path = expected_path
             self._ensure_csv_directory()
-            self._initialize_csv()
+            self._initialize_csv(self.csv_file_path)
             logger.info(f"Rotated CSV to today's file: {self.csv_file_path}")
 
-    def get_csv_file_path(self) -> str:
-        """Public accessor that also rotates file at day boundaries."""
-        self._rotate_csv_if_new_day()
+    def get_csv_file_path(self, user_email: Optional[str] = None) -> str:
+        """Public accessor that also rotates file at day boundaries (per-user)."""
+        self._rotate_csv_if_new_day(user_email)
         return self.csv_file_path
 
     def get_data_dir(self) -> str:
@@ -86,21 +95,22 @@ class QuestionService:
         self._ensure_csv_directory()
         return self.data_dir
     
-    def _ensure_csv_bom(self):
+    def _ensure_csv_bom(self, file_path: Optional[str] = None):
         """Ensure CSV file has UTF-8 BOM for Hebrew support"""
         try:
-            with open(self.csv_file_path, 'rb') as csvfile:
+            target_path = file_path or self.csv_file_path
+            with open(target_path, 'rb') as csvfile:
                 content = csvfile.read()
                 
             # Check if BOM exists
             if not content.startswith(b'\xef\xbb\xbf'):
                 logger.info("Adding UTF-8 BOM to existing CSV file for Hebrew support")
                 # Read existing content
-                with open(self.csv_file_path, 'r', encoding='utf-8') as csvfile:
+                with open(target_path, 'r', encoding='utf-8') as csvfile:
                     existing_content = csvfile.read()
                 
                 # Write with BOM
-                with open(self.csv_file_path, 'wb') as csvfile:
+                with open(target_path, 'wb') as csvfile:
                     csvfile.write(b'\xef\xbb\xbf')
                     csvfile.write(existing_content.encode('utf-8'))
                 
@@ -570,7 +580,7 @@ class QuestionService:
         logger.info(f"Question {question_id[:8]}... soft-deleted successfully")
         return True
     
-    def export_question_to_csv(self, question_id: str) -> bool:
+    def export_question_to_csv(self, question_id: str, user_email: Optional[str] = None) -> bool:
         """Export an approved question to CSV"""
         logger.info(f"Exporting question {question_id[:8]}... to CSV")
         
@@ -586,7 +596,7 @@ class QuestionService:
         
         logger.info(f"Question {question_id[:8]}... is approved, proceeding with CSV export")
         # Ensure we are writing to today's CSV file
-        self._rotate_csv_if_new_day()
+        self._rotate_csv_if_new_day(user_email)
         
         try:
             # Prepare options as string

@@ -108,3 +108,13 @@ class DeleteResponse(BaseModel):
 class ExportResponse(BaseModel):
     success: bool
     file_path: str
+
+# --- Auth/Login ---
+class LoginRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class LoginResponse(BaseModel):
+    success: bool
+    message: Optional[str] = None
