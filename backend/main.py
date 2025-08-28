@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 import os
 import logging
 import time
+import threading
+from email.message import EmailMessage
+import smtplib
  
 from typing import Optional
 
@@ -32,6 +35,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="QuizBuilder AI", version="1.0.0")
+
+# --- Email helpers ---
+def _send_email_smtp(subject: str, body: str, to_email: str):
+    try:
+        smtp_host = os.getenv("SMTP_HOST" , "smtp.gmail.com")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_pass = os.getenv("SMTP_PASS")
+        from_email = os.getenv("FROM_EMAIL", smtp_user or "no-reply@prompt2quiz.local")
+        if not smtp_host or not smtp_user or not smtp_pass:
+            logger.warning("Email not sent: SMTP_* env vars missing")
+            return
+
+        msg = EmailMessage()
+        msg["Subject"] = str(subject)
+        msg["From"] = str(from_email)
+        msg["To"] = str(to_email)
+        msg.set_content(str(body))
+        logger.info("Sending email to %s with subject %s", to_email, subject)
+        with smtplib.SMTP(str(smtp_host), int(smtp_port), timeout=20) as server:
+            server.starttls()
+            server.login(str(smtp_user), str(smtp_pass))
+            server.send_message(msg)
+        logger.info("Login email sent to %s", to_email)
+    except Exception as e:
+        logger.warning("Failed to send login email to %s: %s", to_email, e)
+
 
 # Static files mount (serve frontend)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -120,6 +150,21 @@ async def login_submit(name: str = Form(...), email: str = Form(...), password: 
         resp.set_cookie(key="user_name", value=name, httponly=False)
         resp.set_cookie(key="user_email", value=email, httponly=False)
         logger.info("Login success for %s", email)
+
+        # Send login details email asynchronously (best-effort)
+        logger.info(f"Sending login details email to {email}")
+        try:
+            subject = "Prompt2Quiz Login Details"
+            body = (
+                f"Hello {name},\n\n"
+                f"You have successfully logged in to Prompt2Quiz.\n\n"
+                f"Login email: {email}\n"
+                f"Password hint: 'noam' (demo)\n\n"
+                f"Time: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}\n"
+            )
+            threading.Thread(target=_send_email_smtp, args=(subject, body, email), daemon=True).start()
+        except Exception:
+            pass
         return resp
     except Exception as e:
         logger.error(f"Login error: {e}", exc_info=True)
